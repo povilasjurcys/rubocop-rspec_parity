@@ -1,0 +1,27 @@
+# Default configuration for rubocop-test-coverage
+
+TestCoverage/FileHasSpec:
+  Description: 'Checks that each Ruby file in the app directory has a corresponding spec file.'
+  Enabled: true
+  Include:
+    - 'app/**/*.rb'
+  Exclude:
+    - 'app/assets/**/*'
+    - 'app/views/**/*'
+    - 'app/javascript/**/*'
+
+TestCoverage/PublicMethodHasSpec:
+  Description: 'Checks that each public method has a corresponding spec test.'
+  Enabled: true
+  Include:
+    - 'app/**/*.rb'
+  Exclude:
+    - 'app/assets/**/*'
+    - 'app/views/**/*'
+    - 'app/javascript/**/*'
+
+RSpec/NoLetBang:
+  Description: 'Disallows the use of `let!` in specs.'
+  Enabled: true
+  Include:
+    - 'spec/**/*_spec.rb'

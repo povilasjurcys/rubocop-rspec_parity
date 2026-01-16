@@ -14,182 +14,133 @@ module RuboCop
         MSG = "Missing spec for public method `%<method_name>s`. " \
               "Expected describe '#%<method_name>s' or describe '.%<method_name>s' in %<spec_path>s"
 
-        # Directories that should have spec coverage
-        COVERED_DIRECTORIES = %w[
-          models
-          controllers
-          services
-          jobs
-          mailers
-          helpers
-        ].freeze
-
-        # Methods that are typically inherited/framework methods and don't need explicit tests
-        EXCLUDED_METHODS = %w[
-          initialize
-        ].freeze
-
-        # Patterns for methods that are typically callbacks or framework hooks
-        EXCLUDED_PATTERNS = [
-          /^before_/,
-          /^after_/,
-          /^around_/,
-          /^validate_/,
-          /^autosave_/
-        ].freeze
+        COVERED_DIRECTORIES = %w[models controllers services jobs mailers helpers].freeze
+        EXCLUDED_METHODS = %w[initialize].freeze
+        EXCLUDED_PATTERNS = [/^before_/, /^after_/, /^around_/, /^validate_/, /^autosave_/].freeze
+        VISIBILITY_METHODS = { private: :private, protected: :protected, public: :public }.freeze
 
         def on_def(node)
-          return unless should_check_file?
-          return unless public_method?(node)
-          return if excluded_method?(node.method_name.to_s)
+          return unless checkable_method?(node) && public_method?(node)
 
-          # Check if this method is inside a `class << self` block (eigenclass)
-          is_class_method = inside_eigenclass?(node)
-
-          check_method_has_spec(node, instance_method: !is_class_method)
+          check_method_has_spec(node, instance_method: !inside_eigenclass?(node))
         end
 
-        # Handle class methods (def self.method_name)
         def on_defs(node)
-          return unless should_check_file?
-          return if excluded_method?(node.method_name.to_s)
+          return unless checkable_method?(node)
 
           check_method_has_spec(node, instance_method: false)
         end
 
         private
 
-        # Check if the method is defined inside a `class << self` block
+        def checkable_method?(node)
+          should_check_file? && !excluded_method?(node.method_name.to_s)
+        end
+
         def inside_eigenclass?(node)
-          node.each_ancestor.any? do |ancestor|
-            ancestor.sclass_type? && ancestor.children.first&.self_type?
-          end
+          node.each_ancestor.any? { |a| a.sclass_type? && a.children.first&.self_type? }
         end
 
         def should_check_file?
-          file_path = processed_source.file_path
-          return false if file_path.nil?
-          return false unless file_path.include?("/app/")
-          return false if file_path.end_with?("_spec.rb")
-          return false if file_path.include?("/spec/")
+          path = processed_source.file_path
+          return false if path.nil? || !path.include?("/app/") || path.end_with?("_spec.rb")
 
-          COVERED_DIRECTORIES.any? { |dir| file_path.include?("/app/#{dir}/") }
+          COVERED_DIRECTORIES.any? { |dir| path.include?("/app/#{dir}/") }
         end
 
         def public_method?(node)
-          # Check if method is in public scope
           return false if node.nil?
 
-          # Get the parent to check scope
-          ancestors = node.each_ancestor.to_a
-
-          # Check for explicit private/protected declarations before this method
-          class_or_module = ancestors.find { |n| n.class_type? || n.module_type? }
+          class_or_module = find_class_or_module(node)
           return true unless class_or_module
 
-          # Track visibility as we scan through the class body
+          compute_visibility(class_or_module, node) == :public
+        end
+
+        def find_class_or_module(node)
+          node.each_ancestor.find { |n| n.class_type? || n.module_type? }
+        end
+
+        def compute_visibility(class_or_module, target_node)
           visibility = :public
           class_or_module.body&.each_child_node do |child|
-            break if child == node
+            break if child == target_node
 
-            next unless child.send_type?
-
-            case child.method_name
-            when :private
-              visibility = :private
-            when :protected
-              visibility = :protected
-            when :public
-              visibility = :public
-            when :private_class_method
-              # Handle private_class_method declarations
-              next
-            end
+            visibility = update_visibility(child, visibility)
           end
+          visibility
+        end
 
-          visibility == :public
+        def update_visibility(child, current_visibility)
+          return current_visibility unless child.send_type?
+
+          VISIBILITY_METHODS.fetch(child.method_name, current_visibility)
         end
 
         def excluded_method?(method_name)
-          return true if EXCLUDED_METHODS.include?(method_name)
-          return true if EXCLUDED_PATTERNS.any? { |pattern| pattern.match?(method_name) }
-
-          false
+          EXCLUDED_METHODS.include?(method_name) ||
+            EXCLUDED_PATTERNS.any? { |pattern| pattern.match?(method_name) }
         end
 
-        def check_method_has_spec(node, instance_method: true)
+        def check_method_has_spec(node, instance_method:)
           spec_path = expected_spec_path
           return unless spec_path && File.exist?(spec_path)
 
           method_name = node.method_name.to_s
+          return if spec_covers_method?(spec_path, method_name, instance_method)
 
-          # For service objects with 'call' method, allow testing either .call or #call
-          if in_service_directory? && method_name == "call"
-            return if method_tested_in_spec?(spec_path, method_name, instance_method: true) ||
-                      method_tested_in_spec?(spec_path, method_name, instance_method: false)
-          elsif method_tested_in_spec?(spec_path, method_name, instance_method: instance_method)
-            return
-          end
+          add_method_offense(node, method_name, spec_path)
+        end
 
+        def spec_covers_method?(spec_path, method_name, instance_method)
+          return true if method_tested_in_spec?(spec_path, method_name, instance_method)
+
+          service_call_method?(method_name) && method_tested_in_spec?(spec_path, method_name, !instance_method)
+        end
+
+        def service_call_method?(method_name)
+          method_name == "call" && processed_source.file_path&.include?("/app/services/")
+        end
+
+        def add_method_offense(node, method_name, spec_path)
           add_offense(
             node.loc.keyword.join(node.loc.name),
-            message: format(
-              MSG,
-              method_name: method_name,
-              spec_path: relative_spec_path(spec_path)
-            )
+            message: format(MSG, method_name: method_name, spec_path: relative_spec_path(spec_path))
           )
         end
 
-        def in_service_directory?
-          file_path = processed_source.file_path
-          return false if file_path.nil?
-
-          file_path.include?("/app/services/")
+        def method_tested_in_spec?(spec_path, method_name, instance_method)
+          spec_content = File.read(spec_path)
+          prefix = instance_method ? "#" : "."
+          test_patterns(prefix, method_name).any? { |pattern| spec_content.match?(pattern) }
         end
 
-        def method_tested_in_spec?(spec_path, method_name, instance_method: true)
-          spec_content = File.read(spec_path)
-
-          # Look for describe blocks with the method name
-          # For instance methods: describe '#method_name'
-          # For class methods: describe '.method_name'
-          prefix = instance_method ? "#" : "."
-          patterns = [
-            /describe\s+['"]#{Regexp.escape(prefix)}#{Regexp.escape(method_name)}['"]/,
-            /context\s+['"]#{Regexp.escape(prefix)}#{Regexp.escape(method_name)}['"]/,
-            /it\s+['"](tests?|checks?|verifies?|validates?)\s+#{Regexp.escape(method_name)}/i,
-            /describe\s+['"]#{Regexp.escape(method_name)}['"]/
+        def test_patterns(prefix, method_name)
+          escaped_prefix = Regexp.escape(prefix)
+          escaped_name = Regexp.escape(method_name)
+          [
+            /describe\s+['"]#{escaped_prefix}#{escaped_name}['"]/,
+            /context\s+['"]#{escaped_prefix}#{escaped_name}['"]/,
+            /it\s+['"](tests?|checks?|verifies?|validates?)\s+#{escaped_name}/i,
+            /describe\s+['"]#{escaped_name}['"]/
           ]
-
-          patterns.any? { |pattern| spec_content.match?(pattern) }
         end
 
         def expected_spec_path
-          file_path = processed_source.file_path
-          return nil if file_path.nil?
-
-          file_path
-            .sub("/app/", "/spec/")
-            .sub(/\.rb$/, "_spec.rb")
+          processed_source.file_path&.sub("/app/", "/spec/")&.sub(/\.rb$/, "_spec.rb")
         end
 
         def relative_spec_path(spec_path)
-          project_root = find_project_root
-          return spec_path unless project_root
-
-          spec_path.sub("#{project_root}/", "")
+          root = find_project_root
+          root ? spec_path.sub("#{root}/", "") : spec_path
         end
 
         def find_project_root
-          file_path = processed_source.file_path
-          return nil if file_path.nil?
+          path = processed_source.file_path
+          return nil if path.nil?
 
-          parts = file_path.split("/")
-          app_index = parts.index("app")
-          return nil unless app_index
-
-          parts[0...app_index].join("/")
+          app_index = path.split("/").index("app")
+          app_index ? path.split("/")[0...app_index].join("/") : nil
         end
       end
     end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "rubocop/spec_parity"
+require "rubocop_spec_parity"
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

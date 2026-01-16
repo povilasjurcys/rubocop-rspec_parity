@@ -3,8 +3,20 @@
 require "rubocop_spec_parity"
 require "rubocop/rspec/support"
 
+# Override _investigate to use Commissioner instead of Team
+# Team doesn't trigger callbacks for some cops, but Commissioner does
+module InvestigateOverride
+  def _investigate(cop, processed_source)
+    commissioner = RuboCop::Cop::Commissioner.new([cop], [], raise_error: true)
+    report = commissioner.investigate(processed_source)
+    @last_corrector = report.correctors.first || RuboCop::Cop::Corrector.new(processed_source)
+    report.offenses.reject(&:disabled?)
+  end
+end
+
 RSpec.configure do |config|
-  config.include RuboCop::RSpec::ExpectOffense
+  config.include InvestigateOverride
+
   # Enable flags like --only-failures and --next-failure
   config.example_status_persistence_file_path = ".rspec_status"
 

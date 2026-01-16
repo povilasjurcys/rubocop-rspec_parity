@@ -9,7 +9,8 @@ Gem::Specification.new do |spec|
   spec.email = ["po.jurcys@gmail.com"]
 
   spec.summary = "RuboCop plugin for enforcing spec parity and RSpec best practices"
-  spec.description = "A RuboCop plugin that provides custom cops to ensure test coverage parity and enforce RSpec best practices in your Ruby projects."
+  spec.description = "A RuboCop plugin that provides custom cops to ensure test coverage parity and " \
+                     "enforce RSpec best practices in your Ruby projects."
   spec.homepage = "https://github.com/povilasjurcys/rubocop-spec_parity"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2.0"

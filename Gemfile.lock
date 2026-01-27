@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rubocop-rspec_parity (0.1.0)
+    rubocop-rspec_parity (1.0.0)
       lint_roller (~> 1.1)
       rubocop (>= 1.72.0)
 

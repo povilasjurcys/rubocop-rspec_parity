@@ -42,6 +42,16 @@ Removed: NoLetBang cop
 - Move items from `[Unreleased]` to: `## [X.Y.Z] - YYYY-MM-DD`
 - Leave `[Unreleased]` empty
 
+## Release Process
+
+To release a new version:
+1. Update version in `lib/rubocop/rspec_parity/version.rb`
+2. Update CHANGELOG.md (move [Unreleased] items to new version section)
+3. Run tests: `bundle exec rspec && bundle exec rubocop`
+4. Use rake task to release: `bundle exec rake release`
+   - This will create a git tag, push commits/tags, and push the gem to rubygems.org
+5. **DO NOT** manually run `gem build` or `gem push` - use the rake task
+
 ## Git Commits
 
 - Keep commit descriptions short but clear: 1-5 sentences

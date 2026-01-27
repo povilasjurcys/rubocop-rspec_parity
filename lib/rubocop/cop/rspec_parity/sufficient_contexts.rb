@@ -81,6 +81,7 @@ module RuboCop
           spec_content = File.read(spec_file)
           contexts = count_contexts_for_method(spec_content, method_name(node))
 
+          return if contexts.zero? # Method has no specs at all - PublicMethodHasSpec handles this
           return if contexts >= branches
 
           missing = branches - contexts
@@ -104,7 +105,11 @@ module RuboCop
         end
 
         def in_covered_directory?
-          COVERED_DIRECTORIES.any? { |dir| processed_source.path.start_with?(dir) }
+          path = processed_source.path
+          # Handle both absolute and relative paths
+          COVERED_DIRECTORIES.any? do |dir|
+            path.start_with?(dir) || path.include?("/#{dir}/") || path.match?(%r{/#{Regexp.escape(dir)}$})
+          end
         end
 
         def excluded_method?(method_name)
@@ -115,7 +120,8 @@ module RuboCop
 
         def spec_file_path
           path = processed_source.path
-          path.sub(%r{^app/}, "spec/").sub(/\.rb$/, "_spec.rb")
+          # Handle both absolute and relative paths
+          path.sub(%r{/app/}, "/spec/").sub(%r{^app/}, "spec/").sub(/\.rb$/, "_spec.rb")
         end
 
         def count_branches(node)
@@ -164,37 +170,55 @@ module RuboCop
           when_count + (has_else ? 1 : 0)
         end
 
-        # rubocop:disable Metrics/MethodLength
         def count_contexts_for_method(spec_content, method_name)
           method_pattern = Regexp.escape(method_name)
+          context_count, has_examples = parse_spec_content(spec_content, method_pattern)
+
+          # If no contexts but has examples, count as 1 scenario
+          context_count.zero? && has_examples ? 1 : context_count
+        end
+
+        # rubocop:disable Metrics/MethodLength
+        def parse_spec_content(spec_content, method_pattern)
           in_method_block = false
           context_count = 0
+          has_examples = false
           base_indent = 0
 
           spec_content.each_line do |line|
             current_indent = line[/^\s*/].length
 
-            # Entering a describe block for this method
             if matches_method_describe?(line, method_pattern)
               in_method_block = true
               base_indent = current_indent
-              # Don't count the describe itself, only nested contexts
               next
             end
 
-            # Process lines inside the method block
             if in_method_block
-              in_method_block = false if exiting_block?(line, current_indent, base_indent)
-              context_count += 1 if nested_context?(line)
+              context_count, has_examples, in_method_block = process_method_block_line(
+                line, current_indent, base_indent, context_count, has_examples
+              )
             elsif matches_context_pattern?(line, method_pattern)
               context_count += 1
             end
           end
 
-          context_count
+          [context_count, has_examples]
+        end
+        # rubocop:enable Metrics/MethodLength
+
+        def process_method_block_line(line, current_indent, base_indent, context_count, has_examples)
+          in_method_block = !exiting_block?(line, current_indent, base_indent)
+
+          if nested_context?(line)
+            context_count += 1
+          elsif nested_example?(line)
+            has_examples = true
+          end
+
+          [context_count, has_examples, in_method_block]
         end
 
-        # rubocop:enable Metrics/MethodLength
         def matches_method_describe?(line, method_pattern)
           line =~ /^\s*describe\s+['"](?:#|\.)?#{method_pattern}['"]/ ||
             line =~ /^\s*describe\s+:#{method_pattern}/
@@ -206,6 +230,10 @@ module RuboCop
 
         def nested_context?(line)
           line =~ /^\s*(?:context|describe)\s+/
+        end
+
+        def nested_example?(line)
+          line =~ /^\s*(?:it|example|specify)\s+/
         end
 
         def exiting_block?(line, current_indent, base_indent)

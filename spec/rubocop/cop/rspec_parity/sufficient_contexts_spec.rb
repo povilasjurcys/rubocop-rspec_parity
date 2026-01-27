@@ -140,6 +140,117 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
     end
   end
 
+  describe "methods with no specs at all" do
+    let(:spec_exists) { true }
+    let(:spec_content) do
+      <<~RUBY
+        RSpec.describe UserCreator do
+          describe '#other_method' do
+          end
+        end
+      RUBY
+    end
+
+    it "does not register an offense (PublicMethodHasSpec handles this)" do
+      expect_no_offenses(<<~RUBY, source_path)
+        def create_user(params)
+          if params[:admin]
+            create_admin
+          else
+            create_regular_user
+          end
+        end
+      RUBY
+    end
+  end
+
+  describe "describe blocks with examples but no contexts" do
+    context "when method has 2 branches and describe has direct examples" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              it 'creates users' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts direct examples as 1 scenario and registers offense" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method has 2 branches and describe has multiple direct examples" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              it 'creates admin users' do
+              end
+              it 'creates regular users' do
+              end
+              it 'handles edge cases' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "still counts all direct examples as 1 scenario" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when using example keyword instead of it" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              example 'creates users' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "also counts examples as 1 scenario" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+  end
+
   describe "excluded methods" do
     let(:spec_exists) { true }
     let(:spec_content) { "" }
@@ -172,6 +283,34 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
               true
             else
               false
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when using absolute paths" do
+      let(:source_path) { "/Users/test/myapp/app/services/user_creator.rb" }
+      let(:spec_path) { "/Users/test/myapp/spec/services/user_creator_spec.rb" }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "still detects insufficient contexts" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
             end
           end
         RUBY

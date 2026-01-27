@@ -2,7 +2,7 @@
 
 require "lint_roller"
 
-module Rubocop
+module RuboCop
   module RSpecParity
     # LintRoller plugin for RuboCop integration (RuboCop >= 1.72)
     class Plugin < LintRoller::Plugin

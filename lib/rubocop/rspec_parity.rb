@@ -2,7 +2,7 @@
 
 require_relative "rspec_parity/version"
 
-module Rubocop
+module RuboCop
   module RSpecParity
     class Error < StandardError; end
   end

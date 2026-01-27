@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-RSpec.describe Rubocop::RSpecParity do
+RSpec.describe RuboCop::RSpecParity do
   it "has a version number" do
-    expect(Rubocop::RSpecParity::VERSION).not_to be_nil
+    expect(RuboCop::RSpecParity::VERSION).not_to be_nil
   end
 
   it "loads the cops" do

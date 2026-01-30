@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "spec_file_finder"
+
 module RuboCop
   module Cop
     module RSpecParity
@@ -10,7 +12,9 @@ module RuboCop
       #
       #   # good - public method `perform` has describe '#perform' in spec
       #
-      class PublicMethodHasSpec < Base
+      class PublicMethodHasSpec < Base # rubocop:disable Metrics/ClassLength
+        include SpecFileFinder
+
         MSG = "Missing spec for public method `%<method_name>s`. " \
               "Expected describe '#%<method_name>s' or describe '.%<method_name>s' in %<spec_path>s"
 
@@ -82,14 +86,22 @@ module RuboCop
             EXCLUDED_PATTERNS.any? { |pattern| pattern.match?(method_name) }
         end
 
+        def source_file_path
+          processed_source.file_path
+        end
+
         def check_method_has_spec(node, instance_method:)
-          spec_path = expected_spec_path
-          return unless spec_path && File.exist?(spec_path)
+          class_name = extract_class_name(node)
+          return unless class_name
+
+          base_spec_path = expected_spec_path
+          spec_paths = find_valid_spec_files(class_name, base_spec_path)
+          return if spec_paths.empty?
 
           method_name = node.method_name.to_s
-          return if spec_covers_method?(spec_path, method_name, instance_method)
+          return if spec_paths.any? { |spec_path| spec_covers_method?(spec_path, method_name, instance_method) }
 
-          add_method_offense(node, method_name, spec_path)
+          add_method_offense(node, method_name, spec_paths.first)
         end
 
         def spec_covers_method?(spec_path, method_name, instance_method)

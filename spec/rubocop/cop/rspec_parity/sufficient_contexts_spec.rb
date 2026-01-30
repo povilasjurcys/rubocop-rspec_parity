@@ -399,4 +399,197 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       end
     end
   end
+
+  describe "wildcard spec files" do
+    let(:spec_exists) { true }
+    let(:wildcard_spec_path) { "spec/services/user_creator_updates_spec.rb" }
+
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("spec/services/user_creator_*_spec.rb")
+        .and_return([wildcard_spec_path])
+    end
+
+    context "when wildcard spec file describes the same class" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "aggregates contexts from both spec files" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when wildcard spec file describes a different class" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreatorUpdates do
+            describe '#create_user' do
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not use contexts from wildcard spec file" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when base spec has no contexts but wildcard spec has sufficient contexts" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+          end
+        RUBY
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "uses contexts from wildcard spec file" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when base spec does not exist but wildcard spec does" do
+      let(:spec_exists) { false }
+
+      before do
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "uses wildcard spec file" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method has 3 branches and contexts are split across files" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when moderator' do
+              end
+              context 'when regular user' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "aggregates contexts from both files to meet requirement" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            elsif params[:moderator]
+              create_moderator
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "spec_file_finder"
+
 module RuboCop
   module Cop
     module RSpecParity
@@ -36,6 +38,8 @@ module RuboCop
       #   context 'when creating a regular user' do
       #   end
       class SufficientContexts < Base # rubocop:disable Metrics/ClassLength
+        include SpecFileFinder
+
         MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but only %<contexts>d %<context_word>s " \
               "in spec. Add %<missing>d more %<missing_word>s to cover all branches."
 
@@ -73,18 +77,22 @@ module RuboCop
 
         private
 
-        def check_method(node) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        def check_method(node) # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           return unless in_covered_directory?
           return if excluded_method?(method_name(node))
 
           branches = count_branches(node)
           return if branches < 2 # Only check methods with branches
 
-          spec_file = spec_file_path
-          return unless File.exist?(spec_file)
+          class_name = extract_class_name(node)
+          return unless class_name
 
-          spec_content = File.read(spec_file)
-          contexts = count_contexts_for_method(spec_content, method_name(node))
+          base_spec_path = spec_file_path
+          spec_files = find_valid_spec_files(class_name, base_spec_path)
+          return if spec_files.empty?
+
+          # Aggregate contexts from all valid spec files
+          contexts = spec_files.sum { |spec_file| count_contexts_for_method(File.read(spec_file), method_name(node)) }
 
           return if contexts.zero? # Method has no specs at all - PublicMethodHasSpec handles this
           return if contexts >= branches
@@ -121,6 +129,10 @@ module RuboCop
           return true if EXCLUDED_METHODS.include?(method_name)
 
           EXCLUDED_PATTERNS.any? { |pattern| pattern.match?(method_name) }
+        end
+
+        def source_file_path
+          processed_source.path
         end
 
         def spec_file_path

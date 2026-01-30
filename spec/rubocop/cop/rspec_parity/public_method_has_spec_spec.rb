@@ -838,4 +838,119 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
   end
+
+  describe "wildcard spec files" do
+    let(:wildcard_spec_path) { "/project/spec/models/user_updates_spec.rb" }
+
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("/project/spec/models/user_*_spec.rb")
+        .and_return([wildcard_spec_path])
+    end
+
+    context "when wildcard spec file describes the same class" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return("")
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe User do
+            describe '#update' do
+            end
+          end
+        RUBY
+      end
+
+      it "finds the method in wildcard spec file" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def update
+            end
+          end
+        RUBY
+      end
+
+      it "still registers offense for methods not in any spec" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def delete
+            ^^^^^^^^^^ #{msg("delete")}
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when wildcard spec file describes a different class" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return("")
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe UserUpdates do
+            describe '#update' do
+            end
+          end
+        RUBY
+      end
+
+      it "does not use wildcard spec file" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def update
+            ^^^^^^^^^^ #{msg("update")}
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is in wildcard spec but not in base spec" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          RSpec.describe User do
+            describe '#create' do
+            end
+          end
+        RUBY
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe User do
+            describe '#update' do
+            end
+          end
+        RUBY
+      end
+
+      it "finds method in wildcard spec" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def update
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when base spec file does not exist but wildcard spec does" do
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(false)
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          RSpec.describe User do
+            describe '#perform' do
+            end
+          end
+        RUBY
+      end
+
+      it "still finds the method in wildcard spec" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def perform
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: Support for checking wildcard spec files (`<model>_*_spec.rb`) in addition to base spec file, with automatic class validation
+
 ## [1.0.0] - 2026-01-27
 
 Added: `IgnoreMemoization` configuration option for `SufficientContexts` cop to ignore memoization patterns like `@var ||=` and `return @var if defined?(@var)`

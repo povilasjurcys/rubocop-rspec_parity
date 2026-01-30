@@ -13,6 +13,7 @@ RSpecParity/FileHasSpec:
 RSpecParity/PublicMethodHasSpec:
   Description: 'Checks that each public method has a corresponding spec test.'
   Enabled: true
+  SkipMethodDescribeFor: []
   Include:
     - 'app/**/*.rb'
   Exclude:
@@ -24,6 +25,7 @@ RSpecParity/SufficientContexts:
   Description: 'Ensures specs have at least as many contexts as the method has branches.'
   Enabled: true
   IgnoreMemoization: true
+  SkipMethodDescribeFor: []
   Include:
     - 'app/**/*.rb'
   Exclude:

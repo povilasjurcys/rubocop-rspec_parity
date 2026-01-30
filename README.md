@@ -54,6 +54,60 @@ RSpec.describe UserCreator do
 end
 ```
 
+#### SkipMethodDescribeFor Configuration
+
+For service objects and similar patterns with a single public method, you can skip the method describe block:
+
+```yaml
+RSpecParity/PublicMethodHasSpec:
+  SkipMethodDescribeFor:
+    - 'app/services/**/*'
+    - 'app/operations/**/*'
+
+RSpecParity/SufficientContexts:
+  SkipMethodDescribeFor:
+    - 'app/services/**/*'
+    - 'app/operations/**/*'
+```
+
+With this configuration:
+
+```ruby
+# app/services/user_creator.rb
+class UserCreator
+  def call(params)
+    User.create(params)
+  end
+
+  private
+
+  def validate(params)
+    # Private helper - doesn't count
+  end
+end
+
+# spec/services/user_creator_spec.rb - Valid!
+RSpec.describe UserCreator do
+  it 'creates a user' do
+    # test implementation
+  end
+
+  context 'when invalid params' do
+    it 'raises error' do
+    end
+  end
+end
+```
+
+**Requirements:**
+- Class must have exactly ONE public method
+- Spec must contain at least one example (`it`, `example`, or `specify`)
+- Traditional method describes still work if you prefer them
+
+**How it works:**
+- `PublicMethodHasSpec`: Instead of requiring `describe '#call'`, it just checks that examples exist
+- `SufficientContexts`: Counts top-level contexts/examples instead of looking inside method describes
+
 ### RSpecParity/SufficientContexts
 
 Ensures specs have at least as many contexts as the method has branches.
@@ -169,12 +223,14 @@ RSpecParity/FileHasSpec:
 
 RSpecParity/PublicMethodHasSpec:
   Enabled: true
+  SkipMethodDescribeFor: []  # Paths where single-method classes don't need method describe
   Include:
     - 'app/**/*.rb'
 
 RSpecParity/SufficientContexts:
   Enabled: true
   IgnoreMemoization: true  # Set to false to count memoization patterns as branches
+  SkipMethodDescribeFor: []  # Paths where single-method classes use top-level contexts
   Include:
     - 'app/**/*.rb'
   Exclude:

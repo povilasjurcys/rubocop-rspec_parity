@@ -65,6 +65,7 @@ module RuboCop
         def initialize(config = nil, options = nil)
           super
           @ignore_memoization = cop_config.fetch("IgnoreMemoization", true)
+          @skip_method_describe_paths = cop_config.fetch("SkipMethodDescribeFor", [])
         end
 
         def on_def(node)
@@ -92,7 +93,13 @@ module RuboCop
           return if spec_files.empty?
 
           # Aggregate contexts from all valid spec files
-          contexts = spec_files.sum { |spec_file| count_contexts_for_method(File.read(spec_file), method_name(node)) }
+          contexts = if matches_skip_path? && count_public_methods(node) == 1
+                       # For single-method classes, count top-level contexts instead
+                       spec_files.sum { |spec_file| count_top_level_contexts(File.read(spec_file), class_name) }
+                     else
+                       # Normal path: look for method describes
+                       spec_files.sum { |spec_file| count_contexts_for_method(File.read(spec_file), method_name(node)) }
+                     end
 
           return if contexts.zero? # Method has no specs at all - PublicMethodHasSpec handles this
           return if contexts >= branches
@@ -353,6 +360,88 @@ module RuboCop
           left = node.children[0]
           left&.ivar_type?
         end
+
+        def matches_skip_path?
+          return false if @skip_method_describe_paths.empty?
+
+          path = processed_source.path
+          return false unless path
+
+          @skip_method_describe_paths.any? do |pattern|
+            File.fnmatch?(pattern, path, File::FNM_PATHNAME | File::FNM_EXTGLOB)
+          end
+        end
+
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+        def count_public_methods(node)
+          class_node = find_class_or_module(node)
+          return 0 unless class_node&.body
+
+          public_methods = []
+          visibility = :public
+          visibility_methods = { private: :private, protected: :protected, public: :public }
+
+          # Get all child nodes, handling both single method and begin-wrapped bodies
+          children = if class_node.body.begin_type?
+                       class_node.body.children
+                     else
+                       [class_node.body]
+                     end
+
+          children.each do |child|
+            next unless child
+
+            case child.type
+            when :send
+              visibility = visibility_methods[child.method_name] if visibility_methods.key?(child.method_name)
+            when :def
+              # Only count instance methods (def), not class methods (defs)
+              if visibility == :public
+                method_name = child.method_name.to_s
+                public_methods << method_name unless excluded_method?(method_name)
+              end
+            end
+          end
+
+          public_methods.size
+        end
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+
+        def find_class_or_module(node)
+          node.each_ancestor.find { |n| n.class_type? || n.module_type? }
+        end
+
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+        def count_top_level_contexts(spec_content, class_name)
+          # Find the class describe block
+          describe_pattern = /^\s*(?:RSpec\.)?describe\s+#{Regexp.escape(class_name)}(?:\s|,|do)/
+
+          lines = spec_content.lines
+          describe_line_index = lines.index { |line| line.match?(describe_pattern) }
+          return 0 unless describe_line_index
+
+          # Count contexts/describes and examples at the top level (under class describe)
+          base_indent = lines[describe_line_index].match(/^(\s*)/)[1].length
+          context_count = 0
+          has_examples = false
+
+          lines[(describe_line_index + 1)..].each do |line|
+            indent = line.match(/^(\s*)/)[1].length
+            break if indent <= base_indent && !line.strip.empty? && line.match?(/^\s*(?:describe|context|end)/)
+
+            next unless indent > base_indent
+
+            if line.match?(/^\s*(?:context|describe)\s+/)
+              context_count += 1
+            elsif line.match?(/^\s*(?:it|example|specify)\s+/)
+              has_examples = true
+            end
+          end
+
+          # If no contexts but has examples, count as 1
+          context_count.zero? && has_examples ? 1 : context_count
+        end
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       end
     end
   end

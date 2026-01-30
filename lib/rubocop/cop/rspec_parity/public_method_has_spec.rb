@@ -23,6 +23,11 @@ module RuboCop
         EXCLUDED_PATTERNS = [/^before_/, /^after_/, /^around_/, /^validate_/, /^autosave_/].freeze
         VISIBILITY_METHODS = { private: :private, protected: :protected, public: :public }.freeze
 
+        def initialize(config = nil, options = nil)
+          super
+          @skip_method_describe_paths = cop_config.fetch("SkipMethodDescribeFor", [])
+        end
+
         def on_def(node)
           return unless checkable_method?(node) && public_method?(node)
 
@@ -90,6 +95,7 @@ module RuboCop
           processed_source.file_path
         end
 
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         def check_method_has_spec(node, instance_method:)
           class_name = extract_class_name(node)
           return unless class_name
@@ -99,10 +105,19 @@ module RuboCop
           return if spec_paths.empty?
 
           method_name = node.method_name.to_s
-          return if spec_paths.any? { |spec_path| spec_covers_method?(spec_path, method_name, instance_method) }
+
+          # Check if relaxed validation applies
+          if matches_skip_path? && count_public_methods(node) == 1
+            # For single-method classes in configured paths, just check for examples
+            return if spec_paths.any? { |spec_path| spec_has_examples?(spec_path, class_name) }
+          elsif spec_paths.any? { |spec_path| spec_covers_method?(spec_path, method_name, instance_method) }
+            # Normal validation: check for method describe
+            return
+          end
 
           add_method_offense(node, method_name, spec_paths.first)
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
         def spec_covers_method?(spec_path, method_name, instance_method)
           return true if method_tested_in_spec?(spec_path, method_name, instance_method)
@@ -153,6 +168,72 @@ module RuboCop
 
           app_index = path.split("/").index("app")
           app_index ? path.split("/")[0...app_index].join("/") : nil
+        end
+
+        def matches_skip_path?
+          return false if @skip_method_describe_paths.empty?
+
+          file_path = processed_source.file_path
+          return false unless file_path
+
+          @skip_method_describe_paths.any? do |pattern|
+            # Match against both absolute path and relative path
+            File.fnmatch?(pattern, file_path, File::FNM_PATHNAME | File::FNM_EXTGLOB) ||
+              File.fnmatch?(pattern, extract_relative_path(file_path), File::FNM_PATHNAME | File::FNM_EXTGLOB)
+          end
+        end
+
+        def extract_relative_path(file_path)
+          # Extract path starting from 'app/' directory
+          app_index = file_path.split("/").index("app")
+          return file_path unless app_index
+
+          file_path.split("/")[app_index..].join("/")
+        end
+
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+        def count_public_methods(node)
+          class_node = find_class_or_module(node)
+          return 0 unless class_node&.body
+
+          public_methods = []
+          visibility = :public
+
+          # Get all child nodes, handling both single method and begin-wrapped bodies
+          children = if class_node.body.begin_type?
+                       class_node.body.children
+                     else
+                       [class_node.body]
+                     end
+
+          children.each do |child|
+            next unless child
+
+            case child.type
+            when :send
+              visibility = VISIBILITY_METHODS[child.method_name] if VISIBILITY_METHODS.key?(child.method_name)
+            when :def
+              # Only count instance methods (def), not class methods (defs)
+              if visibility == :public
+                method_name = child.method_name.to_s
+                public_methods << method_name unless excluded_method?(method_name)
+              end
+            end
+          end
+
+          public_methods.size
+        end
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+
+        def spec_has_examples?(spec_path, class_name)
+          spec_content = File.read(spec_path)
+          escaped_class_name = Regexp.escape(class_name)
+
+          # Check that the spec describes the correct class
+          return false unless spec_content.match?(/(?:RSpec\.)?describe\s+#{escaped_class_name}(?:\s|,|do)/)
+
+          # Check for any it/example/specify blocks
+          spec_content.match?(/^\s*(?:it|example|specify)\s+/)
         end
       end
     end

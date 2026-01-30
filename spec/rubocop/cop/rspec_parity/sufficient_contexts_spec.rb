@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
-  subject(:cop) { described_class.new }
-
+RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
   let(:spec_path) { "spec/services/user_creator_spec.rb" }
   let(:source_path) { "app/services/user_creator.rb" }
 
@@ -47,7 +45,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
         it "registers an offense" do
           expect_offense(<<~RUBY, source_path)
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
               if params[:admin]
                 create_admin
               else
@@ -181,7 +179,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       it "counts direct examples as 1 scenario and registers offense" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             if params[:admin]
               create_admin
             else
@@ -212,7 +210,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       it "still counts all direct examples as 1 scenario" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             if params[:admin]
               create_admin
             else
@@ -239,7 +237,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       it "also counts examples as 1 scenario" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             if params[:admin]
               create_admin
             else
@@ -311,7 +309,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       it "still counts regular branches" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             @cached_value ||= if some_condition
               value_a
             else
@@ -388,7 +386,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       it "still detects insufficient contexts" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             if params[:admin]
               create_admin
             else
@@ -475,7 +473,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
       it "does not use contexts from wildcard spec file" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ RSpecParity/SufficientContexts: Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             if params[:admin]
               create_admin
             else
@@ -586,6 +584,147 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts do
               create_moderator
             else
               create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+  end
+
+  describe "SkipMethodDescribeFor configuration" do
+    let(:source_path) { "app/services/user_creator.rb" }
+    let(:spec_path) { "spec/services/user_creator_spec.rb" }
+    let(:spec_exists) { true }
+    let(:cop_config) do
+      { "SkipMethodDescribeFor" => ["app/services/**/*"] }
+    end
+
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("spec/services/user_creator_*_spec.rb")
+        .and_return([])
+    end
+
+    context "single method with branches and top-level contexts" do
+      let(:spec_content) do
+        <<~RUBY
+          describe UserCreator do
+            context 'when valid' do
+              it 'creates user' do
+              end
+            end
+
+            context 'when invalid' do
+              it 'raises error' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts top-level contexts instead of method contexts" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call(params)
+              if params[:valid]
+                create_user
+              else
+                raise "Invalid"
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method with branches but insufficient contexts" do
+      let(:spec_content) do
+        <<~RUBY
+          describe UserCreator do
+            it 'works' do
+            end
+          end
+        RUBY
+      end
+
+      it "registers offense for insufficient coverage" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def call(params)
+            ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+              if params[:valid]
+                create_user
+              else
+                raise "Invalid"
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method with branches and direct examples at top level" do
+      let(:spec_content) do
+        <<~RUBY
+          describe UserCreator do
+            it 'creates user when valid' do
+            end
+
+            it 'raises error when invalid' do
+            end
+          end
+        RUBY
+      end
+
+      it "counts as 1 scenario since no contexts" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def call(params)
+            ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+              if params[:valid]
+                create_user
+              else
+                raise "Invalid"
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "multiple public methods" do
+      let(:spec_content) do
+        <<~RUBY
+          describe UserCreator do
+            describe '#call' do
+              context 'when valid' do
+                it 'creates user' do
+                end
+              end
+
+              context 'when invalid' do
+                it 'raises error' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "uses normal method-based counting" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call(params)
+              if params[:valid]
+                create_user
+              else
+                raise "Invalid"
+              end
+            end
+
+            def another_method
+              # not counted, only call checked
             end
           end
         RUBY

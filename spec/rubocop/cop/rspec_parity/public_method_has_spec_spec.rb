@@ -953,4 +953,184 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
   end
+
+  describe "SkipMethodDescribeFor configuration" do
+    let(:source_path) { "/project/app/services/user_creator.rb" }
+    let(:spec_path) { "/project/spec/services/user_creator_spec.rb" }
+    let(:cop_config) do
+      { "SkipMethodDescribeFor" => ["app/services/**/*"] }
+    end
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(spec_path).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("/project/spec/services/user_creator_*_spec.rb")
+        .and_return([])
+    end
+
+    context "single method class with direct examples" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            it 'creates a user' do
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method class with contexts but no method describe" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            context 'when valid' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call
+              do_something
+            end
+
+            private
+
+            def do_something
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method class with traditional method describe" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            describe '#call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "multiple public methods" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            it 'works' do
+            end
+          end
+        RUBY
+      end
+
+      it "registers offense for uncovered methods" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_creator_spec.rb
+            end
+
+            def another_method
+            ^^^^^^^^^^^^^^^^^^ Missing spec for public method `another_method`. Expected describe '#another_method' or describe '.another_method' in spec/services/user_creator_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method but no examples in spec" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            # No examples
+          end
+        RUBY
+      end
+
+      it "registers an offense" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_creator_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "path does not match configuration" do
+      let(:source_path) { "/project/app/models/user.rb" }
+      let(:spec_path) { "/project/spec/models/user_spec.rb" }
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe User do
+            it 'works' do
+            end
+          end
+        RUBY
+      end
+
+      it "registers an offense" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/models/user_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "configuration is empty array" do
+      let(:cop_config) { { "SkipMethodDescribeFor" => [] } }
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            it 'works' do
+            end
+          end
+        RUBY
+      end
+
+      it "registers an offense" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_creator_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

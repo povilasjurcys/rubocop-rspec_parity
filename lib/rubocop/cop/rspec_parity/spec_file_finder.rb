@@ -61,6 +61,13 @@ module RuboCop
           spec_content.match?(/(?:RSpec\.)?describe\s+#{Regexp.escape(class_name)}(?:\s|,|do)/)
         end
 
+        def describe_aliases_for(describe_key)
+          value = @describe_aliases[describe_key]
+          return [] unless value
+
+          Array(value).map(&:to_s)
+        end
+
         # Override this method in the including class
         def source_file_path
           processed_source.file_path

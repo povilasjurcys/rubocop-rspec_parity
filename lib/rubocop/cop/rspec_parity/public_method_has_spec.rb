@@ -26,6 +26,7 @@ module RuboCop
         def initialize(config = nil, options = nil)
           super
           @skip_method_describe_paths = cop_config.fetch("SkipMethodDescribeFor", [])
+          @describe_aliases = cop_config.fetch("DescribeAliases", {})
         end
 
         def on_def(node)
@@ -122,11 +123,13 @@ module RuboCop
         def spec_covers_method?(spec_path, method_name, instance_method)
           return true if method_tested_in_spec?(spec_path, method_name, instance_method)
 
-          service_call_method?(method_name) && method_tested_in_spec?(spec_path, method_name, !instance_method)
-        end
-
-        def service_call_method?(method_name)
-          method_name == "call" && processed_source.file_path&.include?("/app/services/")
+          prefix = instance_method ? "#" : "."
+          describe_key = "#{prefix}#{method_name}"
+          describe_aliases_for(describe_key).any? do |alias_desc|
+            alias_name = alias_desc.sub(/^[#.]/, "")
+            alias_instance = !alias_desc.start_with?(".")
+            method_tested_in_spec?(spec_path, alias_name, alias_instance)
+          end
         end
 
         def add_method_offense(node, method_name, spec_path)

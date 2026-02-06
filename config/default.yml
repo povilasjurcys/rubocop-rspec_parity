@@ -14,6 +14,7 @@ RSpecParity/PublicMethodHasSpec:
   Description: 'Checks that each public method has a corresponding spec test.'
   Enabled: true
   SkipMethodDescribeFor: []
+  DescribeAliases: {}
   Include:
     - 'app/**/*.rb'
   Exclude:
@@ -26,6 +27,7 @@ RSpecParity/SufficientContexts:
   Enabled: true
   IgnoreMemoization: true
   SkipMethodDescribeFor: []
+  DescribeAliases: {}
   Include:
     - 'app/**/*.rb'
   Exclude:

@@ -627,11 +627,20 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
     end
   end
 
-  describe "service call method special handling" do
+  describe "DescribeAliases configuration" do
     let(:source_path) { "/project/app/services/user_service.rb" }
     let(:spec_path) { "/project/spec/services/user_service_spec.rb" }
 
-    context "when service has call method with class method spec" do
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("/project/spec/services/user_service_*_spec.rb")
+        .and_return([])
+    end
+
+    context "with same-name alias ('#call' => '.call')" do
+      let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
+
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
           describe UserService do
@@ -643,7 +652,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         RUBY
       end
 
-      it "does not register an offense for instance call method" do
+      it "does not register an offense for instance def call with .call spec" do
         expect_no_offenses(<<~RUBY, source_path)
           class UserService
             def call
@@ -653,7 +662,94 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-    context "when service has call method with instance method spec" do
+    context "with different-name alias ('#perform' => '.perform_later')" do
+      let(:source_path) { "/project/app/jobs/user_job.rb" }
+      let(:spec_path) { "/project/spec/jobs/user_job_spec.rb" }
+      let(:cop_config) { { "DescribeAliases" => { "#perform" => ".perform_later" } } }
+
+      before do
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/jobs/user_job_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserJob do
+            describe '.perform_later' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense for instance def perform with .perform_later spec" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserJob
+            def perform
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with array alias ('#perform' => ['.perform_later', '.perform_now'])" do
+      let(:source_path) { "/project/app/jobs/user_job.rb" }
+      let(:spec_path) { "/project/spec/jobs/user_job_spec.rb" }
+      let(:cop_config) { { "DescribeAliases" => { "#perform" => [".perform_later", ".perform_now"] } } }
+
+      before do
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/jobs/user_job_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserJob do
+            describe '.perform_now' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense when any alias matches" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserJob
+            def perform
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with no alias configured" do
+      let(:cop_config) { { "DescribeAliases" => {} } }
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            describe '.call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "registers an offense for instance def call with only .call spec" do
+        expect_offense(<<~RUBY, source_path)
+          class UserService
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when alias does not apply to class methods (def self.call)" do
+      let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
+
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
           describe UserService do
@@ -665,21 +761,26 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         RUBY
       end
 
-      it "does not register an offense" do
-        expect_no_offenses(<<~RUBY, source_path)
+      it "registers an offense for def self.call with only #call spec" do
+        expect_offense(<<~RUBY, source_path)
           class UserService
-            def call
+            def self.call
+            ^^^^^^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
             end
           end
         RUBY
       end
     end
 
-    context "when service has call method with no spec" do
+    context "when neither original nor alias matches" do
+      let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
+
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
           describe UserService do
             describe '#other_method' do
+              it 'works' do
+              end
             end
           end
         RUBY
@@ -696,24 +797,24 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-    context "when non-service has call method" do
-      let(:source_path) { "/project/app/models/user.rb" }
-      let(:spec_path) { "/project/spec/models/user_spec.rb" }
+    context "when instance method spec exists (no alias needed)" do
+      let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
 
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
-          describe User do
-            describe '.call' do
+          describe UserService do
+            describe '#call' do
+              it 'works' do
+              end
             end
           end
         RUBY
       end
 
-      it "registers an offense when only class method spec exists" do
-        expect_offense(<<~RUBY, source_path)
-          class User
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserService
             def call
-            ^^^^^^^^ #{msg("call")}
             end
           end
         RUBY

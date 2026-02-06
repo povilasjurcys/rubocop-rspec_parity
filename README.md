@@ -108,6 +108,72 @@ end
 - `PublicMethodHasSpec`: Instead of requiring `describe '#call'`, it just checks that examples exist
 - `SufficientContexts`: Counts top-level contexts/examples instead of looking inside method describes
 
+#### DescribeAliases Configuration
+
+When an instance method is tested via a class method (e.g., service objects where `def call` is tested via `describe '.call'`, or jobs where `def perform` is tested via `describe '.perform_later'`), you can configure describe aliases:
+
+```yaml
+RSpecParity/PublicMethodHasSpec:
+  DescribeAliases:
+    '#call': '.call'
+    '#perform':
+      - '.perform_later'
+      - '.perform_now'
+
+RSpecParity/SufficientContexts:
+  DescribeAliases:
+    '#call': '.call'
+    '#perform':
+      - '.perform_later'
+      - '.perform_now'
+```
+
+With this configuration:
+
+```ruby
+# app/services/user_creator.rb
+class UserCreator
+  def call(params)
+    User.create(params)
+  end
+end
+
+# spec/services/user_creator_spec.rb - Valid!
+# The alias '#call' => '.call' allows .call to satisfy #call
+RSpec.describe UserCreator do
+  describe '.call' do
+    it 'creates a user' do
+      # test implementation
+    end
+  end
+end
+```
+
+```ruby
+# app/jobs/user_job.rb
+class UserJob
+  def perform(params)
+    process(params)
+  end
+end
+
+# spec/jobs/user_job_spec.rb - Valid!
+# The alias '#perform' => ['.perform_later', '.perform_now'] allows either
+RSpec.describe UserJob do
+  describe '.perform_later' do
+    it 'processes params' do
+      # test implementation
+    end
+  end
+end
+```
+
+**Notes:**
+- Keys use `#` for instance method describes, `.` for class method describes
+- Values can be a single string or an array of strings
+- Aliases are unidirectional: `'#call': '.call'` allows `.call` to satisfy `#call`, but not vice versa
+- `SufficientContexts` aggregates contexts from both the original and alias describe blocks
+
 ### RSpecParity/SufficientContexts
 
 Ensures specs have at least as many contexts as the method has branches.
@@ -224,6 +290,7 @@ RSpecParity/FileHasSpec:
 RSpecParity/PublicMethodHasSpec:
   Enabled: true
   SkipMethodDescribeFor: []  # Paths where single-method classes don't need method describe
+  DescribeAliases: {}  # Map describe strings to aliases, e.g. '#call': '.call'
   Include:
     - 'app/**/*.rb'
 
@@ -231,6 +298,7 @@ RSpecParity/SufficientContexts:
   Enabled: true
   IgnoreMemoization: true  # Set to false to count memoization patterns as branches
   SkipMethodDescribeFor: []  # Paths where single-method classes use top-level contexts
+  DescribeAliases: {}  # Map describe strings to aliases, e.g. '#call': '.call'
   Include:
     - 'app/**/*.rb'
   Exclude:

@@ -591,6 +591,130 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
     end
   end
 
+  describe "DescribeAliases configuration" do
+    let(:spec_exists) { true }
+    let(:cop_config) do
+      { "DescribeAliases" => { "#call" => ".invoke" } }
+    end
+
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("spec/services/user_creator_*_spec.rb")
+        .and_return([])
+    end
+
+    context "when alias describe has sufficient contexts" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '.invoke' do
+              context 'when valid' do
+              end
+              context 'when invalid' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def call(params)
+            if params[:valid]
+              process
+            else
+              raise "Invalid"
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when alias describe has insufficient contexts" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '.invoke' do
+              context 'when valid' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "registers an offense" do
+        expect_offense(<<~RUBY, source_path)
+          def call(params)
+          ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:valid]
+              process
+            else
+              raise "Invalid"
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when alias contexts aggregate with base contexts" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#call' do
+              context 'when valid' do
+              end
+            end
+            describe '.invoke' do
+              context 'when invalid' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def call(params)
+            if params[:valid]
+              process
+            else
+              raise "Invalid"
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with empty config" do
+      let(:cop_config) { { "DescribeAliases" => {} } }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '.invoke' do
+              context 'when valid' do
+              end
+              context 'when invalid' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not count alias contexts" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def call(params)
+            if params[:valid]
+              process
+            else
+              raise "Invalid"
+            end
+          end
+        RUBY
+      end
+    end
+  end
+
   describe "SkipMethodDescribeFor configuration" do
     let(:source_path) { "app/services/user_creator.rb" }
     let(:spec_path) { "spec/services/user_creator_spec.rb" }

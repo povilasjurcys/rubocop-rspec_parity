@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-06
+
 Added: Support for checking wildcard spec files (`<model>_*_spec.rb`) in addition to base spec file, with automatic class validation
 Added: `SkipMethodDescribeFor` configuration for `PublicMethodHasSpec` and `SufficientContexts` cops to allow single-method classes (like service objects) to skip method describe blocks in specs
 Added: `DescribeAliases` configuration for mapping describe strings to alias describe patterns

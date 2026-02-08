@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: `FileHasSpec` cop to check that each Ruby file in the app directory has a corresponding spec file
+
 ## [1.1.0] - 2026-02-06
 
 Added: Support for checking wildcard spec files (`<model>_*_spec.rb`) in addition to base spec file, with automatic class validation

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-09
+
 Added: `SufficientContexts` now counts direct `it` blocks alongside `context` blocks as an additional implicit context
 
 ## [1.1.0] - 2026-02-06

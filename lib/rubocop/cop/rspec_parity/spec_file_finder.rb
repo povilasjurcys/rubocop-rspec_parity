@@ -11,13 +11,25 @@ module RuboCop
           class_node = find_class_or_module(node)
 
           if class_node
-            # Get the class/module name from the AST
             const_node = class_node.children[0]
-            return const_node.const_name if const_node.const_type?
+            return fully_qualified_class_name(class_node) if const_node.const_type?
           end
 
           # Fallback: infer class name from file path
           infer_class_name_from_path
+        end
+
+        def fully_qualified_class_name(class_node)
+          names = [class_node.children[0].const_name]
+          current = class_node
+
+          while (ancestor = current.each_ancestor.find { |n| n.class_type? || n.module_type? })
+            ancestor_const = ancestor.children[0]
+            names.unshift(ancestor_const.const_name) if ancestor_const.const_type?
+            current = ancestor
+          end
+
+          names.join("::")
         end
 
         def find_class_or_module(node)

@@ -1314,5 +1314,97 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         RUBY
       end
     end
+
+    context "nested module class with method describe in spec" do
+      let(:source_path) { "/project/app/services/calendar/user_creator.rb" }
+      let(:spec_path) { "/project/spec/services/calendar/user_creator_spec.rb" }
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/services/calendar/user_creator_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          RSpec.describe Calendar::UserCreator do
+            describe '#call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense when spec has describe '#call'" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Calendar
+            class UserCreator
+              def call
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "nested module class with direct examples in spec" do
+      let(:source_path) { "/project/app/services/calendar/user_creator.rb" }
+      let(:spec_path) { "/project/spec/services/calendar/user_creator_spec.rb" }
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/services/calendar/user_creator_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          RSpec.describe Calendar::UserCreator do
+            it 'creates a user' do
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense for single-method class with examples" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Calendar
+            class UserCreator
+              def call
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "nested module class without SkipMethodDescribeFor" do
+      let(:source_path) { "/project/app/models/calendar/user.rb" }
+      let(:spec_path) { "/project/spec/models/calendar/user_spec.rb" }
+      let(:cop_config) { { "SkipMethodDescribeFor" => [] } }
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/models/calendar/user_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          RSpec.describe Calendar::User do
+            describe '#call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense (normal validation finds describe '#call')" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Calendar
+            class User
+              def call
+              end
+            end
+          end
+        RUBY
+      end
+    end
   end
 end

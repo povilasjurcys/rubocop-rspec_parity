@@ -221,6 +221,104 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       end
     end
 
+    context "when describe has direct it block and context at same level" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              it 'does stuff' do
+              end
+
+              context 'when things get weird' do
+                it 'does stuff differently' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts as 2 contexts (direct examples + context block)" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when describe has direct it block and multiple contexts at same level" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              it 'does the default thing' do
+              end
+
+              context 'when admin' do
+                it 'creates admin' do
+                end
+              end
+
+              context 'when moderator' do
+                it 'creates moderator' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts as 3 contexts (direct examples + 2 context blocks)" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            elsif params[:moderator]
+              create_moderator
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when describe has it blocks only inside contexts (not direct)" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+                it 'creates admin' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not count nested it blocks as additional context" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when using example keyword instead of it" do
       let(:spec_exists) { true }
       let(:spec_content) do
@@ -806,6 +904,36 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
           class UserCreator
             def call(params)
             ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+              if params[:valid]
+                create_user
+              else
+                raise "Invalid"
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method with direct it block and context at top level" do
+      let(:spec_content) do
+        <<~RUBY
+          describe UserCreator do
+            it 'does the default thing' do
+            end
+
+            context 'when invalid' do
+              it 'raises error' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts as 2 contexts (direct examples + context block)" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call(params)
               if params[:valid]
                 create_user
               else

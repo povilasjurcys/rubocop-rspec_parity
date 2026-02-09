@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: `SufficientContexts` now counts direct `it` blocks alongside `context` blocks as an additional implicit context
+
 ## [1.1.0] - 2026-02-06
 
 Added: Support for checking wildcard spec files (`<model>_*_spec.rb`) in addition to base spec file, with automatic class validation

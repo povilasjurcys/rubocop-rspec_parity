@@ -218,18 +218,25 @@ module RuboCop
 
         def count_contexts_for_method(spec_content, method_name)
           method_pattern = Regexp.escape(method_name)
-          context_count, has_examples = parse_spec_content(spec_content, method_pattern)
+          context_count, has_examples, has_direct_examples = parse_spec_content(spec_content, method_pattern)
 
-          # If no contexts but has examples, count as 1 scenario
-          context_count.zero? && has_examples ? 1 : context_count
+          if context_count.positive? && has_direct_examples
+            context_count + 1
+          elsif context_count.zero? && has_examples
+            1
+          else
+            context_count
+          end
         end
 
         # rubocop:disable Metrics/MethodLength
-        def parse_spec_content(spec_content, method_pattern)
+        def parse_spec_content(spec_content, method_pattern) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           in_method_block = false
           context_count = 0
           has_examples = false
+          has_direct_examples = false
           base_indent = 0
+          child_indent = nil
 
           spec_content.each_line do |line|
             current_indent = line[/^\s*/].length
@@ -237,33 +244,29 @@ module RuboCop
             if matches_method_describe?(line, method_pattern)
               in_method_block = true
               base_indent = current_indent
+              child_indent = nil
               next
             end
 
             if in_method_block
-              context_count, has_examples, in_method_block = process_method_block_line(
-                line, current_indent, base_indent, context_count, has_examples
-              )
+              if exiting_block?(line, current_indent, base_indent)
+                in_method_block = false
+              elsif nested_context?(line)
+                child_indent ||= current_indent
+                context_count += 1
+              elsif nested_example?(line)
+                has_examples = true
+                child_indent ||= current_indent
+                has_direct_examples = true if current_indent == child_indent
+              end
             elsif matches_context_pattern?(line, method_pattern)
               context_count += 1
             end
           end
 
-          [context_count, has_examples]
+          [context_count, has_examples, has_direct_examples]
         end
         # rubocop:enable Metrics/MethodLength
-
-        def process_method_block_line(line, current_indent, base_indent, context_count, has_examples)
-          in_method_block = !exiting_block?(line, current_indent, base_indent)
-
-          if nested_context?(line)
-            context_count += 1
-          elsif nested_example?(line)
-            has_examples = true
-          end
-
-          [context_count, has_examples, in_method_block]
-        end
 
         def matches_method_describe?(line, method_pattern)
           line =~ /^\s*describe\s+['"](?:#|\.)?#{method_pattern}['"]/ ||
@@ -434,6 +437,8 @@ module RuboCop
           base_indent = lines[describe_line_index].match(/^(\s*)/)[1].length
           context_count = 0
           has_examples = false
+          has_direct_examples = false
+          child_indent = nil
 
           lines[(describe_line_index + 1)..].each do |line|
             indent = line.match(/^(\s*)/)[1].length
@@ -442,14 +447,22 @@ module RuboCop
             next unless indent > base_indent
 
             if line.match?(/^\s*(?:context|describe)\s+/)
+              child_indent ||= indent
               context_count += 1
             elsif line.match?(/^\s*(?:it|example|specify)\s+/)
               has_examples = true
+              child_indent ||= indent
+              has_direct_examples = true if indent == child_indent
             end
           end
 
-          # If no contexts but has examples, count as 1
-          context_count.zero? && has_examples ? 1 : context_count
+          if context_count.positive? && has_direct_examples
+            context_count + 1
+          elsif context_count.zero? && has_examples
+            1
+          else
+            context_count
+          end
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       end

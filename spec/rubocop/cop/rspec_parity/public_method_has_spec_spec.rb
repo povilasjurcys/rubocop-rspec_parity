@@ -457,6 +457,47 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when spec has only one-liner it blocks without descriptions" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe User do
+            describe '#perform' do
+              it { is_expected.to be_truthy }
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def perform
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when spec has one-liner it block without method describe" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe User do
+            it { is_expected.to be_truthy }
+          end
+        RUBY
+      end
+
+      it "registers an offense" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when spec does not cover the method" do
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
@@ -1161,6 +1202,46 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
 
             def another_method
             ^^^^^^^^^^^^^^^^^^ Missing spec for public method `another_method`. Expected describe '#another_method' or describe '.another_method' in spec/services/user_creator_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method class with one-liner it blocks" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            it { is_expected.to be_truthy }
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method class with one-liner it block inside context" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            context 'when valid' do
+              it { is_expected.to be_truthy }
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call
             end
           end
         RUBY

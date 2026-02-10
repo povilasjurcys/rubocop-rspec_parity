@@ -258,6 +258,7 @@ module RuboCop
 
           public_methods = []
           targeted_non_public = []
+          targeted_public = []
           visibility = :public
           children = scope_children(class_node)
 
@@ -266,7 +267,8 @@ module RuboCop
 
             case child.type
             when :send
-              count_public_methods_handle_send(child, visibility, targeted_non_public).tap { |v| visibility = v if v }
+              result = count_handle_visibility_send(child, targeted_non_public, targeted_public)
+              visibility = result if result
             when :def
               if visibility == :public
                 method_name = child.method_name.to_s
@@ -275,26 +277,32 @@ module RuboCop
             end
           end
 
-          (public_methods - targeted_non_public).size
+          ((public_methods - targeted_non_public) | targeted_public).size
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-        def count_public_methods_handle_send(child, visibility, targeted_non_public)
-          return visibility unless VISIBILITY_METHODS.key?(child.method_name)
+        def count_handle_visibility_send(child, targeted_non_public, targeted_public)
+          return nil unless VISIBILITY_METHODS.key?(child.method_name)
+          return VISIBILITY_METHODS[child.method_name] if child.arguments.empty?
 
-          if child.arguments.empty?
-            VISIBILITY_METHODS[child.method_name]
-          else
-            collect_targeted_non_public(child, targeted_non_public)
-            nil
+          collect_targeted_methods(child, targeted_non_public, targeted_public)
+          nil
+        end
+
+        def collect_targeted_methods(child, targeted_non_public, targeted_public)
+          target_list = VISIBILITY_METHODS[child.method_name] == :public ? targeted_public : targeted_non_public
+
+          child.arguments.each do |arg|
+            name = targeted_method_name(arg)
+            target_list << name if name && !excluded_method?(name)
           end
         end
 
-        def collect_targeted_non_public(child, targeted_non_public)
-          return if VISIBILITY_METHODS[child.method_name] == :public
-
-          child.arguments.each do |arg|
-            targeted_non_public << arg.value.to_s if arg.sym_type?
+        def targeted_method_name(arg)
+          if arg.sym_type?
+            arg.value.to_s
+          elsif arg.def_type?
+            arg.method_name.to_s
           end
         end
 

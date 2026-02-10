@@ -250,6 +250,31 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when public section reopens after private section" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers offenses only for public methods" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            private
+
+            def some_method
+            end
+
+            public
+
+            def some_public_method1
+            ^^^^^^^^^^^^^^^^^^^^^^^ #{msg("some_public_method1")}
+            end
+
+            def some_public_method2
+            ^^^^^^^^^^^^^^^^^^^^^^^ #{msg("some_public_method2")}
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when method is after multiple visibility changes" do
       it "respects the last visibility change" do
         expect_no_offenses(<<~RUBY, source_path)
@@ -411,6 +436,40 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
 
               def find_by_name
               end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is re-publicized with public :method_name after private section" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            private
+
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+
+            public :perform
+          end
+        RUBY
+      end
+    end
+
+    context "when method is re-publicized with public def after private section" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            private
+
+            public def perform
+                   ^^^^^^^^^^^ #{msg("perform")}
             end
           end
         RUBY
@@ -1348,6 +1407,52 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
             private
 
             def do_something
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method class using public :method_name to re-publicize" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            it 'creates a user' do
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            private
+
+            def call
+            end
+
+            public :call
+          end
+        RUBY
+      end
+    end
+
+    context "single method class using public def to re-publicize" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            it 'creates a user' do
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            private
+
+            public def call
             end
           end
         RUBY

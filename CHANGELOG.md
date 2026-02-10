@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.2.2] - 2026-02-10
+
 Added: `PublicMethodHasSpec` now skips class methods marked with `private_class_method` (both inline and post-hoc forms)
 
 ## [1.2.1] - 2026-02-09

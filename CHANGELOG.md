@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.4] - 2026-02-10
+
+Fixed: `PublicMethodHasSpec` correctly counts methods re-publicized with `public :method_name` and `public def method_name` for SkipMethodDescribeFor validation
+
 ## [1.2.3] - 2026-02-10
 
 Fixed: `PublicMethodHasSpec` correctly detects visibility for `private :method_name`, `protected :method_name`, `private def method_name`, `protected def method_name`, and `private`/`protected` inside `class << self`

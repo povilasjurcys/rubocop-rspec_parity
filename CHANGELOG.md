@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: `PublicMethodHasSpec` now skips class methods marked with `private_class_method` (both inline and post-hoc forms)
+
 ## [1.2.1] - 2026-02-09
 
 Fixed: Detect tested methods correctly for classes nested inside modules (e.g. `Calendar::UserCreator`)

@@ -36,12 +36,34 @@ module RuboCop
         end
 
         def on_defs(node)
-          return unless checkable_method?(node)
+          return unless checkable_method?(node) && public_class_method?(node)
 
           check_method_has_spec(node, instance_method: false)
         end
 
         private
+
+        def public_class_method?(node)
+          # Inline form: private_class_method def self.method_name
+          return false if node.parent&.send_type? && node.parent.method_name == :private_class_method
+
+          # Post-hoc form: private_class_method :method_name
+          class_node = find_class_or_module(node)
+          return true unless class_node&.body
+
+          !private_class_method_declared?(class_node, node.method_name)
+        end
+
+        def private_class_method_declared?(class_node, method_name)
+          children = class_node.body.begin_type? ? class_node.body.children : [class_node.body]
+          children.any? { |child| private_class_method_call?(child, method_name) }
+        end
+
+        def private_class_method_call?(node, method_name)
+          node&.send_type? &&
+            node.method_name == :private_class_method &&
+            node.arguments.any? { |arg| arg.sym_type? && arg.value == method_name }
+        end
 
         def checkable_method?(node)
           should_check_file? && !excluded_method?(node.method_name.to_s)

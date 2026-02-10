@@ -643,6 +643,49 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when class method is marked with private_class_method (post-hoc)" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def self.find_by_name
+            end
+
+            private_class_method :find_by_name
+          end
+        RUBY
+      end
+    end
+
+    context "when class method is marked with private_class_method (inline)" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            private_class_method def self.find_by_name
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when only some class methods are private_class_method" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense only for the public class method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def self.public_finder
+            ^^^^^^^^^^^^^^^^^^^^^^ Missing spec for public method `public_finder`. Expected describe '#public_finder' or describe '.public_finder' in spec/models/user_spec.rb
+            end
+
+            def self.secret_finder
+            end
+
+            private_class_method :secret_finder
+          end
+        RUBY
+      end
+    end
+
     context "when eigenclass method has matching spec" do
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)

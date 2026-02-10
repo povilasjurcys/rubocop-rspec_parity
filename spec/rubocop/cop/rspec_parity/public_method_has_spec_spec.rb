@@ -266,6 +266,156 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         RUBY
       end
     end
+
+    context "when method is made private with post-hoc private :method_name" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def perform
+            end
+
+            private :perform
+          end
+        RUBY
+      end
+    end
+
+    context "when method is made protected with post-hoc protected :method_name" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def perform
+            end
+
+            protected :perform
+          end
+        RUBY
+      end
+    end
+
+    context "when method after post-hoc private :other remains public" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def secret
+            end
+
+            private :secret
+
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method after post-hoc protected :other remains public" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def secret
+            end
+
+            protected :secret
+
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is made private with inline private def" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            private def perform
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is made protected with inline protected def" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            protected def perform
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method after inline private def other remains public" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            private def secret
+            end
+
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method after inline protected def other remains public" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            protected def secret
+            end
+
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside class << self" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            class << self
+              private
+
+              def find_by_name
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is protected inside class << self" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            class << self
+              protected
+
+              def find_by_name
+              end
+            end
+          end
+        RUBY
+      end
+    end
   end
 
   describe "spec pattern matching" do

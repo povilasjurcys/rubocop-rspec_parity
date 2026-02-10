@@ -83,14 +83,48 @@ module RuboCop
         def public_method?(node)
           return false if node.nil?
 
-          class_or_module = find_class_or_module(node)
-          return true unless class_or_module
+          # Inline form: private def method_name / protected def method_name
+          if node.parent&.send_type? && VISIBILITY_METHODS.key?(node.parent.method_name)
+            return node.parent.method_name == :public
+          end
 
-          compute_visibility(class_or_module, node) == :public
+          scope = find_enclosing_scope(node)
+          return true unless scope
+
+          # Post-hoc targeted form overrides section-level visibility
+          targeted = targeted_visibility(scope, node.method_name)
+          return targeted == :public unless targeted.nil?
+
+          compute_visibility(scope, node) == :public
+        end
+
+        def find_enclosing_scope(node)
+          node.each_ancestor.find { |n| n.class_type? || n.module_type? || n.sclass_type? }
         end
 
         def find_class_or_module(node)
           node.each_ancestor.find { |n| n.class_type? || n.module_type? }
+        end
+
+        def targeted_visibility(scope, method_name)
+          return nil unless scope.body
+
+          scope_children(scope).each do |child|
+            next unless targeted_visibility_call?(child, method_name)
+
+            return VISIBILITY_METHODS[child.method_name]
+          end
+          nil
+        end
+
+        def targeted_visibility_call?(node, method_name)
+          node&.send_type? &&
+            VISIBILITY_METHODS.key?(node.method_name) &&
+            node.arguments.any? { |arg| arg.sym_type? && arg.value == method_name }
+        end
+
+        def scope_children(scope)
+          scope.body.begin_type? ? scope.body.children : [scope.body]
         end
 
         def compute_visibility(class_or_module, target_node)
@@ -105,6 +139,7 @@ module RuboCop
 
         def update_visibility(child, current_visibility)
           return current_visibility unless child.send_type?
+          return current_visibility if child.arguments.any? # targeted/inline, not section-level
 
           VISIBILITY_METHODS.fetch(child.method_name, current_visibility)
         end
@@ -222,23 +257,17 @@ module RuboCop
           return 0 unless class_node&.body
 
           public_methods = []
+          targeted_non_public = []
           visibility = :public
-
-          # Get all child nodes, handling both single method and begin-wrapped bodies
-          children = if class_node.body.begin_type?
-                       class_node.body.children
-                     else
-                       [class_node.body]
-                     end
+          children = scope_children(class_node)
 
           children.each do |child|
             next unless child
 
             case child.type
             when :send
-              visibility = VISIBILITY_METHODS[child.method_name] if VISIBILITY_METHODS.key?(child.method_name)
+              count_public_methods_handle_send(child, visibility, targeted_non_public).tap { |v| visibility = v if v }
             when :def
-              # Only count instance methods (def), not class methods (defs)
               if visibility == :public
                 method_name = child.method_name.to_s
                 public_methods << method_name unless excluded_method?(method_name)
@@ -246,9 +275,28 @@ module RuboCop
             end
           end
 
-          public_methods.size
+          (public_methods - targeted_non_public).size
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+
+        def count_public_methods_handle_send(child, visibility, targeted_non_public)
+          return visibility unless VISIBILITY_METHODS.key?(child.method_name)
+
+          if child.arguments.empty?
+            VISIBILITY_METHODS[child.method_name]
+          else
+            collect_targeted_non_public(child, targeted_non_public)
+            nil
+          end
+        end
+
+        def collect_targeted_non_public(child, targeted_non_public)
+          return if VISIBILITY_METHODS[child.method_name] == :public
+
+          child.arguments.each do |arg|
+            targeted_non_public << arg.value.to_s if arg.sym_type?
+          end
+        end
 
         def spec_has_examples?(spec_path, class_name)
           spec_content = File.read(spec_path)

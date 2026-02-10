@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.2.3] - 2026-02-10
+
+Fixed: `PublicMethodHasSpec` correctly detects visibility for `private :method_name`, `protected :method_name`, `private def method_name`, `protected def method_name`, and `private`/`protected` inside `class << self`
+
 ## [1.2.2] - 2026-02-10
 
 Added: `PublicMethodHasSpec` now skips class methods marked with `private_class_method` (both inline and post-hoc forms)

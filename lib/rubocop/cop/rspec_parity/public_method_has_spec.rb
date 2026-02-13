@@ -20,6 +20,7 @@ module RuboCop
 
         COVERED_DIRECTORIES = %w[models controllers services jobs mailers helpers].freeze
         EXCLUDED_METHODS = %w[initialize].freeze
+        EXCLUDED_HOOK_METHODS = %w[included extended inherited prepended].freeze
         EXCLUDED_PATTERNS = [/^before_/, /^after_/, /^around_/, /^validate_/, /^autosave_/].freeze
         VISIBILITY_METHODS = { private: :private, protected: :protected, public: :public }.freeze
 
@@ -37,6 +38,7 @@ module RuboCop
 
         def on_defs(node)
           return unless checkable_method?(node) && public_class_method?(node)
+          return if EXCLUDED_HOOK_METHODS.include?(node.method_name.to_s)
 
           check_method_has_spec(node, instance_method: false)
         end

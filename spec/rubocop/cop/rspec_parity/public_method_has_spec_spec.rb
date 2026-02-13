@@ -797,6 +797,50 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         RUBY
       end
     end
+
+    context "with self.included hook method" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserMethods
+            def self.included(base)
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with self.extended hook method" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserMethods
+            def self.extended(base)
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with self.inherited hook method" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            def self.inherited(subclass)
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with self.prepended hook method" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserMethods
+            def self.prepended(base)
+            end
+          end
+        RUBY
+      end
+    end
   end
 
   describe "class methods" do

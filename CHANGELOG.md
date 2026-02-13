@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.3.1] - 2026-02-13
+
+Added: `PublicMethodHasSpec` now excludes Ruby hook methods (`self.included`, `self.extended`, `self.inherited`, `self.prepended`) from requiring specs
+
 ## [1.3.0] - 2026-02-13
 
 Added: `IgnoreMemoization` now skips all `||=` patterns including local variables and hash keys, not just instance variables

@@ -416,6 +416,44 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
           end
         RUBY
       end
+
+      it "does not count local_var ||= as a branch" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def cached_value
+            result ||= expensive_operation
+            result
+          end
+        RUBY
+      end
+
+      it "does not count hash[key] ||= as a branch" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def cached_value
+            @cache[:key] ||= expensive_operation
+          end
+        RUBY
+      end
+
+      it "does not count nested hash ||= as a branch" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def cached_value
+            @cache[:foo][:bar] ||= expensive_operation
+          end
+        RUBY
+      end
+
+      it "still counts regular branches with local var ||=" do
+        expect_offense(<<~RUBY, source_path)
+          def cached_value
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            result ||= if some_condition
+              value_a
+            else
+              value_b
+            end
+          end
+        RUBY
+      end
     end
 
     context "with IgnoreMemoization disabled" do
@@ -440,6 +478,25 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
           ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             return @cached_value if defined?(@cached_value)
             @cached_value = expensive_operation
+          end
+        RUBY
+      end
+
+      it "counts local_var ||= as a branch" do
+        expect_offense(<<~RUBY, source_path)
+          def cached_value
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            result ||= expensive_operation
+            result
+          end
+        RUBY
+      end
+
+      it "counts hash[key] ||= as a branch" do
+        expect_offense(<<~RUBY, source_path)
+          def cached_value
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            @cache[:key] ||= expensive_operation
           end
         RUBY
       end

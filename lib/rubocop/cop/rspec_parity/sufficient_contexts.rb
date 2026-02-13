@@ -300,8 +300,8 @@ module RuboCop
         end
 
         def memoization_pattern?(node)
-          # Pattern: @var ||= value
-          return true if or_asgn_ivar_pattern?(node)
+          # Pattern: var ||= value (any target: ivar, lvar, hash element, etc.)
+          return true if or_asgn_pattern?(node)
 
           # Pattern: return @var if defined?(@var)
           return true if defined_check_pattern?(node)
@@ -309,15 +309,15 @@ module RuboCop
           # Pattern: @var = value if @var.nil? or similar
           return true if nil_check_pattern?(node)
 
-          # Pattern: || with instance variable (part of @var ||= which creates both :or and :or_asgn nodes)
-          return true if or_with_ivar_pattern?(node)
+          # Pattern: || inside ||= (which creates both :or and :or_asgn nodes)
+          return true if or_inside_or_asgn_pattern?(node)
 
           false
         end
 
-        # @var ||= value
-        def or_asgn_ivar_pattern?(node)
-          node.or_asgn_type? && node.children[0]&.ivasgn_type?
+        # var ||= value (any target)
+        def or_asgn_pattern?(node)
+          node.or_asgn_type?
         end
 
         # return @var if defined?(@var)
@@ -366,12 +366,9 @@ module RuboCop
           receiver&.ivar_type? && receiver.children[0] == ivar_name
         end
 
-        # || operator with instance variable on left side
-        def or_with_ivar_pattern?(node)
-          return false unless node.or_type?
-
-          left = node.children[0]
-          left&.ivar_type?
+        # || inside ||= (||= generates both :or_asgn and :or child nodes)
+        def or_inside_or_asgn_pattern?(node)
+          node.or_type? && node.parent&.or_asgn_type?
         end
 
         def matches_skip_path?

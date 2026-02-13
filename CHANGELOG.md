@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-13
+
+Added: `IgnoreMemoization` now skips all `||=` patterns including local variables and hash keys, not just instance variables
+
 ## [1.2.4] - 2026-02-10
 
 Fixed: `PublicMethodHasSpec` correctly counts methods re-publicized with `public :method_name` and `public def method_name` for SkipMethodDescribeFor validation

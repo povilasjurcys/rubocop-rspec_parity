@@ -16,7 +16,7 @@ module RuboCop
         include SpecFileFinder
 
         MSG = "Missing spec for public method `%<method_name>s`. " \
-              "Expected describe '#%<method_name>s' or describe '.%<method_name>s' in %<spec_path>s"
+              "Expected %<expected>s in %<spec_path>s"
 
         COVERED_DIRECTORIES = %w[models controllers services jobs mailers helpers].freeze
         EXCLUDED_METHODS = %w[initialize].freeze
@@ -32,6 +32,7 @@ module RuboCop
 
         def on_def(node)
           return unless checkable_method?(node) && public_method?(node)
+          return if inside_inner_class?(node)
 
           check_method_has_spec(node, instance_method: !inside_eigenclass?(node))
         end
@@ -39,6 +40,7 @@ module RuboCop
         def on_defs(node)
           return unless checkable_method?(node) && public_class_method?(node)
           return if EXCLUDED_HOOK_METHODS.include?(node.method_name.to_s)
+          return if inside_inner_class?(node)
 
           check_method_has_spec(node, instance_method: false)
         end
@@ -73,6 +75,13 @@ module RuboCop
 
         def inside_eigenclass?(node)
           node.each_ancestor.any? { |a| a.sclass_type? && a.children.first&.self_type? }
+        end
+
+        def inside_inner_class?(node)
+          enclosing = find_class_or_module(node)
+          return false unless enclosing
+
+          enclosing.each_ancestor.any?(&:class_type?)
         end
 
         def should_check_file?
@@ -175,7 +184,7 @@ module RuboCop
             return
           end
 
-          add_method_offense(node, method_name, spec_paths.first)
+          add_method_offense(node, method_name, spec_paths.first, instance_method: instance_method)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
@@ -191,11 +200,21 @@ module RuboCop
           end
         end
 
-        def add_method_offense(node, method_name, spec_path)
+        def add_method_offense(node, method_name, spec_path, instance_method:)
+          prefix = instance_method ? "#" : "."
+          expected = expected_describes(prefix, method_name)
           add_offense(
             node.loc.keyword.join(node.loc.name),
-            message: format(MSG, method_name: method_name, spec_path: relative_spec_path(spec_path))
+            message: format(MSG, method_name: method_name, expected: expected, spec_path: relative_spec_path(spec_path))
           )
+        end
+
+        def expected_describes(prefix, method_name)
+          describes = ["describe '#{prefix}#{method_name}'"]
+          describe_aliases_for("#{prefix}#{method_name}").each do |alias_desc|
+            describes << "describe '#{alias_desc}'"
+          end
+          describes.join(" or ")
         end
 
         def method_tested_in_spec?(spec_path, method_name, instance_method)

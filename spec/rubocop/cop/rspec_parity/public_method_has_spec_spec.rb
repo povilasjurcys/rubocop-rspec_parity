@@ -4,9 +4,11 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
   let(:spec_path) { "/project/spec/models/user_spec.rb" }
   let(:source_path) { "/project/app/models/user.rb" }
 
-  def msg(method_name, spec_file = "spec/models/user_spec.rb")
+  def msg(method_name, spec_file = "spec/models/user_spec.rb", prefix: "#", aliases: [])
+    expected = ["describe '#{prefix}#{method_name}'"]
+    aliases.each { |a| expected << "describe '#{a}'" }
     "Missing spec for public method `#{method_name}`. " \
-      "Expected describe '##{method_name}' or describe '.#{method_name}' in #{spec_file}"
+      "Expected #{expected.join(" or ")} in #{spec_file}"
   end
 
   before do
@@ -851,7 +853,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class User
             def self.find_by_name
-            ^^^^^^^^^^^^^^^^^^^^^ Missing spec for public method `find_by_name`. Expected describe '#find_by_name' or describe '.find_by_name' in spec/models/user_spec.rb
+            ^^^^^^^^^^^^^^^^^^^^^ Missing spec for public method `find_by_name`. Expected describe '.find_by_name' in spec/models/user_spec.rb
             end
           end
         RUBY
@@ -888,7 +890,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
           class User
             class << self
               def find_by_name
-              ^^^^^^^^^^^^^^^^ Missing spec for public method `find_by_name`. Expected describe '#find_by_name' or describe '.find_by_name' in spec/models/user_spec.rb
+              ^^^^^^^^^^^^^^^^ Missing spec for public method `find_by_name`. Expected describe '.find_by_name' in spec/models/user_spec.rb
               end
             end
           end
@@ -927,7 +929,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class User
             def self.public_finder
-            ^^^^^^^^^^^^^^^^^^^^^^ Missing spec for public method `public_finder`. Expected describe '#public_finder' or describe '.public_finder' in spec/models/user_spec.rb
+            ^^^^^^^^^^^^^^^^^^^^^^ Missing spec for public method `public_finder`. Expected describe '.public_finder' in spec/models/user_spec.rb
             end
 
             def self.secret_finder
@@ -1077,7 +1079,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class UserService
             def call
-            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' in spec/services/user_service_spec.rb
             end
           end
         RUBY
@@ -1102,7 +1104,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class UserService
             def self.call
-            ^^^^^^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
+            ^^^^^^^^^^^^^ Missing spec for public method `call`. Expected describe '.call' in spec/services/user_service_spec.rb
             end
           end
         RUBY
@@ -1128,6 +1130,54 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
           class UserService
             def call
             ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when offense message includes different-name alias" do
+      let(:source_path) { "/project/app/jobs/user_job.rb" }
+      let(:spec_path) { "/project/spec/jobs/user_job_spec.rb" }
+      let(:cop_config) { { "DescribeAliases" => { "#perform" => ".perform_later" } } }
+
+      before do
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/jobs/user_job_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return("")
+      end
+
+      it "shows both original and alias in message" do
+        expect_offense(<<~RUBY, source_path)
+          class UserJob
+            def perform
+            ^^^^^^^^^^^ Missing spec for public method `perform`. Expected describe '#perform' or describe '.perform_later' in spec/jobs/user_job_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when offense message includes array aliases" do
+      let(:source_path) { "/project/app/jobs/user_job.rb" }
+      let(:spec_path) { "/project/spec/jobs/user_job_spec.rb" }
+      let(:cop_config) { { "DescribeAliases" => { "#perform" => [".perform_later", ".perform_now"] } } }
+
+      before do
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/jobs/user_job_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return("")
+      end
+
+      it "shows original and all aliases in message" do
+        expect_offense(<<~RUBY, source_path)
+          class UserJob
+            def perform
+            ^^^^^^^^^^^ Missing spec for public method `perform`. Expected describe '#perform' or describe '.perform_later' or describe '.perform_now' in spec/jobs/user_job_spec.rb
             end
           end
         RUBY
@@ -1187,6 +1237,113 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
     end
   end
 
+  describe "inner classes" do
+    context "when class is nested inside another class" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "does not register an offense for inner class methods" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            class Address
+              def street
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when class is nested inside another class with outer public methods" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense only for the outer class method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+
+            class Address
+              def street
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when class is nested inside a module (namespace)" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "still registers an offense for the namespaced class method" do
+        expect_offense(<<~RUBY, source_path)
+          module UserMethods
+            class User
+              def perform
+              ^^^^^^^^^^^ #{msg("perform")}
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when class is deeply nested inside another class" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "does not register an offense for deeply nested inner class methods" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            class Settings
+              class Notification
+                def enabled?
+                end
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when inner class has class methods" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "does not register an offense for inner class class methods" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            class Address
+              def self.from_params(params)
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when inner class is inside a module-namespaced class" do
+      let(:source_path) { "/project/app/services/calendar/event.rb" }
+      let(:spec_path) { "/project/spec/services/calendar/event_spec.rb" }
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(File).to receive(:read).with(spec_path).and_return("")
+      end
+
+      it "does not register an offense for inner class methods" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Calendar
+            class Event
+              class Recurrence
+                def next_occurrence
+                end
+              end
+            end
+          end
+        RUBY
+      end
+    end
+  end
+
   describe "modules" do
     before { allow(File).to receive(:read).with(spec_path).and_return("") }
 
@@ -1208,7 +1365,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       expect_offense(<<~RUBY, source_path)
         class User
           def valid?
-          ^^^^^^^^^^ Missing spec for public method `valid?`. Expected describe '#valid?' or describe '.valid?' in spec/models/user_spec.rb
+          ^^^^^^^^^^ Missing spec for public method `valid?`. Expected describe '#valid?' in spec/models/user_spec.rb
           end
         end
       RUBY
@@ -1218,7 +1375,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       expect_offense(<<~RUBY, source_path)
         class User
           def save!
-          ^^^^^^^^^ Missing spec for public method `save!`. Expected describe '#save!' or describe '.save!' in spec/models/user_spec.rb
+          ^^^^^^^^^ Missing spec for public method `save!`. Expected describe '#save!' in spec/models/user_spec.rb
           end
         end
       RUBY
@@ -1228,7 +1385,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       expect_offense(<<~RUBY, source_path)
         class User
           def name=(value)
-          ^^^^^^^^^ Missing spec for public method `name=`. Expected describe '#name=' or describe '.name=' in spec/models/user_spec.rb
+          ^^^^^^^^^ Missing spec for public method `name=`. Expected describe '#name=' in spec/models/user_spec.rb
           end
         end
       RUBY
@@ -1574,11 +1731,11 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def call
-            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_creator_spec.rb
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' in spec/services/user_creator_spec.rb
             end
 
             def another_method
-            ^^^^^^^^^^^^^^^^^^ Missing spec for public method `another_method`. Expected describe '#another_method' or describe '.another_method' in spec/services/user_creator_spec.rb
+            ^^^^^^^^^^^^^^^^^^ Missing spec for public method `another_method`. Expected describe '#another_method' in spec/services/user_creator_spec.rb
             end
           end
         RUBY
@@ -1638,7 +1795,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def call
-            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_creator_spec.rb
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' in spec/services/user_creator_spec.rb
             end
           end
         RUBY
@@ -1662,7 +1819,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class User
             def call
-            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/models/user_spec.rb
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' in spec/models/user_spec.rb
             end
           end
         RUBY
@@ -1685,7 +1842,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def call
-            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_creator_spec.rb
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' in spec/services/user_creator_spec.rb
             end
           end
         RUBY

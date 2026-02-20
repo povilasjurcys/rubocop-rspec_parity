@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+Fixed: `PublicMethodHasSpec` offense message now shows correct method prefix (`#` for instance methods, `.` for class methods) and includes configured `DescribeAliases` in the expected describes
+Fixed: `PublicMethodHasSpec` no longer reports methods in inner classes (class nested inside another class) as needing specs
+
 ## [1.3.2] - 2026-02-20
 
 Fixed: `PublicMethodHasSpec` now recognizes specs that use module wrapping (e.g., `module Foo; RSpec.describe Bar`) instead of fully qualified class names

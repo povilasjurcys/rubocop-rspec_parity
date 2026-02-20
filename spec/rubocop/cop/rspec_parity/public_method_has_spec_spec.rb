@@ -1369,6 +1369,41 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when wildcard spec uses module wrapping instead of fully qualified class name" do
+      let(:source_path) { "/project/app/services/authentication/create_session.rb" }
+      let(:spec_path) { "/project/spec/services/authentication/create_session_spec.rb" }
+      let(:wildcard_spec_path) { "/project/spec/services/authentication/create_session_edge_cases_spec.rb" }
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(File).to receive(:read).with(spec_path).and_return("")
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/services/authentication/create_session_*_spec.rb")
+          .and_return([wildcard_spec_path])
+        allow(File).to receive(:exist?).with(wildcard_spec_path).and_return(true)
+        allow(File).to receive(:read).with(wildcard_spec_path).and_return(<<~RUBY)
+          module Authentication
+            RSpec.describe CreateSession do
+              describe '#call' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "finds the method in the module-wrapped wildcard spec" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Authentication
+            class CreateSession
+              def call
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when base spec file does not exist but wildcard spec does" do
       before do
         allow(File).to receive(:exist?).with(spec_path).and_return(false)
@@ -1741,6 +1776,76 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_no_offenses(<<~RUBY, source_path)
           module Calendar
             class User
+              def call
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when spec uses module wrapping instead of fully qualified class name" do
+      let(:source_path) { "/project/app/services/authentication/create_session.rb" }
+      let(:spec_path) { "/project/spec/services/authentication/create_session_spec.rb" }
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/services/authentication/create_session_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          module Authentication
+            RSpec.describe CreateSession do
+              it 'creates a session' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense for single-method class with examples" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Authentication
+            class CreateSession
+              def call
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when spec uses module wrapping and DescribeAliases are configured" do
+      let(:source_path) { "/project/app/services/authentication/create_session.rb" }
+      let(:spec_path) { "/project/spec/services/authentication/create_session_spec.rb" }
+      let(:cop_config) do
+        {
+          "SkipMethodDescribeFor" => ["app/services/**/*"],
+          "DescribeAliases" => { "#call" => ".call" }
+        }
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(Dir).to receive(:glob)
+          .with("/project/spec/services/authentication/create_session_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          module Authentication
+            RSpec.describe CreateSession do
+              describe '.call' do
+                it 'creates a session' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense when alias matches via describe" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Authentication
+            class CreateSession
               def call
               end
             end

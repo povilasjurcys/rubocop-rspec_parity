@@ -69,8 +69,16 @@ module RuboCop
 
         def spec_describes_class?(spec_path, class_name)
           spec_content = File.read(spec_path)
-          # Match RSpec.describe ClassName or describe ClassName
-          spec_content.match?(/(?:RSpec\.)?describe\s+#{Regexp.escape(class_name)}(?:\s|,|do)/)
+          class_name_variants(class_name).any? do |name|
+            spec_content.match?(/(?:RSpec\.)?describe\s+#{Regexp.escape(name)}(?:\s|,|do)/)
+          end
+        end
+
+        def class_name_variants(class_name)
+          parts = class_name.split("::")
+          return [class_name] if parts.size <= 1
+
+          [class_name, parts.last]
         end
 
         def describe_aliases_for(describe_key)

@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.3.2] - 2026-02-20
+
+Fixed: `PublicMethodHasSpec` now recognizes specs that use module wrapping (e.g., `module Foo; RSpec.describe Bar`) instead of fully qualified class names
+
 ## [1.3.1] - 2026-02-13
 
 Added: `PublicMethodHasSpec` now excludes Ruby hook methods (`self.included`, `self.extended`, `self.inherited`, `self.prepended`) from requiring specs

@@ -310,10 +310,11 @@ module RuboCop
 
         def spec_has_examples?(spec_path, class_name)
           spec_content = File.read(spec_path)
-          escaped_class_name = Regexp.escape(class_name)
 
-          # Check that the spec describes the correct class
-          return false unless spec_content.match?(/(?:RSpec\.)?describe\s+#{escaped_class_name}(?:\s|,|do)/)
+          # Check that the spec describes the correct class (supports module-wrapped specs)
+          return false unless class_name_variants(class_name).any? do |name|
+            spec_content.match?(/(?:RSpec\.)?describe\s+#{Regexp.escape(name)}(?:\s|,|do)/)
+          end
 
           # Check for any it/example/specify blocks
           spec_content.match?(/^\s*(?:it|example|specify)\s+/)

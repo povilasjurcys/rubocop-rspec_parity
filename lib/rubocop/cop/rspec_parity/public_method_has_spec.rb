@@ -81,7 +81,24 @@ module RuboCop
           enclosing = find_class_or_module(node)
           return false unless enclosing
 
-          enclosing.each_ancestor.any?(&:class_type?)
+          enclosing.each_ancestor.any? { |a| a.class_type? && class_has_methods?(a) }
+        end
+
+        def class_has_methods?(class_node)
+          return false unless class_node.body
+
+          children = class_node.body.begin_type? ? class_node.body.children : [class_node.body]
+          children.any? { |child| child.def_type? || child.defs_type? || eigenclass_with_methods?(child) }
+        end
+
+        def eigenclass_with_methods?(node)
+          return false unless node.sclass_type? && node.children.first&.self_type?
+
+          body = node.body
+          return false unless body
+
+          body_children = body.begin_type? ? body.children : [body]
+          body_children.any?(&:def_type?)
         end
 
         def should_check_file?

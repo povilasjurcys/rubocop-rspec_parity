@@ -1238,22 +1238,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
   end
 
   describe "inner classes" do
-    context "when class is nested inside another class" do
-      before { allow(File).to receive(:read).with(spec_path).and_return("") }
-
-      it "does not register an offense for inner class methods" do
-        expect_no_offenses(<<~RUBY, source_path)
-          class User
-            class Address
-              def street
-              end
-            end
-          end
-        RUBY
-      end
-    end
-
-    context "when class is nested inside another class with outer public methods" do
+    context "when parent class has methods and nested class exists" do
       before { allow(File).to receive(:read).with(spec_path).and_return("") }
 
       it "registers an offense only for the outer class method" do
@@ -1265,6 +1250,22 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
 
             class Address
               def street
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when parent class has no methods and nested class exists" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "still checks the nested class methods" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            class Address
+              def street
+              ^^^^^^^^^^ #{msg("street")}
               end
             end
           end
@@ -1288,12 +1289,16 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-    context "when class is deeply nested inside another class" do
+    context "when parent class has methods and deeply nested class exists" do
       before { allow(File).to receive(:read).with(spec_path).and_return("") }
 
-      it "does not register an offense for deeply nested inner class methods" do
-        expect_no_offenses(<<~RUBY, source_path)
+      it "registers offense for outer method but not inner class methods" do
+        expect_offense(<<~RUBY, source_path)
           class User
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+
             class Settings
               class Notification
                 def enabled?
@@ -1305,12 +1310,16 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-    context "when inner class has class methods" do
+    context "when parent class has methods and inner class has class methods" do
       before { allow(File).to receive(:read).with(spec_path).and_return("") }
 
-      it "does not register an offense for inner class class methods" do
-        expect_no_offenses(<<~RUBY, source_path)
+      it "registers offense for outer method but not inner class methods" do
+        expect_offense(<<~RUBY, source_path)
           class User
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
+            end
+
             class Address
               def self.from_params(params)
               end
@@ -1320,7 +1329,28 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-    context "when inner class is inside a module-namespaced class" do
+    context "when parent class has class methods via eigenclass" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers offense for eigenclass method but not inner class methods" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            class << self
+              def find_all
+              ^^^^^^^^^^^^ #{msg("find_all", prefix: ".")}
+              end
+            end
+
+            class Address
+              def street
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when inner class is inside a module-namespaced class with methods" do
       let(:source_path) { "/project/app/services/calendar/event.rb" }
       let(:spec_path) { "/project/spec/services/calendar/event_spec.rb" }
 
@@ -1329,10 +1359,14 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         allow(File).to receive(:read).with(spec_path).and_return("")
       end
 
-      it "does not register an offense for inner class methods" do
-        expect_no_offenses(<<~RUBY, source_path)
+      it "registers offense for outer method but not inner class methods" do
+        expect_offense(<<~RUBY, source_path)
           module Calendar
             class Event
+              def title
+              ^^^^^^^^^ #{msg("title", "spec/services/calendar/event_spec.rb")}
+              end
+
               class Recurrence
                 def next_occurrence
                 end

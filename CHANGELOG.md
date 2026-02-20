@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.3.3] - 2026-02-20
+
 Fixed: `PublicMethodHasSpec` offense message now shows correct method prefix (`#` for instance methods, `.` for class methods) and includes configured `DescribeAliases` in the expected describes
 Fixed: `PublicMethodHasSpec` no longer reports methods in inner classes (class nested inside another class) as needing specs
 

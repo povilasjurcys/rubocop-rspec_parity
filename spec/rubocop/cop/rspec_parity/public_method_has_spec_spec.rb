@@ -941,6 +941,67 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when method is defined inside class_methods block" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense expecting '.method_name' pattern" do
+        expect_offense(<<~RUBY, source_path)
+          module UserMethods
+            extend ActiveSupport::Concern
+
+            class_methods do
+              def find_by_name
+              ^^^^^^^^^^^^^^^^ Missing spec for public method `find_by_name`. Expected describe '.find_by_name' in spec/models/user_spec.rb
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method in class_methods block has matching spec" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserMethods do
+            describe '.find_by_name' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserMethods
+            extend ActiveSupport::Concern
+
+            class_methods do
+              def find_by_name
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside class_methods block" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserMethods
+            extend ActiveSupport::Concern
+
+            class_methods do
+              private
+
+              def find_by_name
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when eigenclass method has matching spec" do
       before do
         allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)

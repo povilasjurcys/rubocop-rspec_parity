@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: `PublicMethodHasSpec` now treats methods inside `class_methods do` blocks (ActiveSupport::Concern) as class methods, expecting `.method_name` in specs
+
 ## [1.3.3] - 2026-02-20
 
 Fixed: `PublicMethodHasSpec` offense message now shows correct method prefix (`#` for instance methods, `.` for class methods) and includes configured `DescribeAliases` in the expected describes

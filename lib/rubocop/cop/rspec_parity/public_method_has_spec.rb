@@ -34,7 +34,7 @@ module RuboCop
           return unless checkable_method?(node) && public_method?(node)
           return if inside_inner_class?(node)
 
-          check_method_has_spec(node, instance_method: !inside_eigenclass?(node))
+          check_method_has_spec(node, instance_method: !inside_eigenclass?(node) && !inside_class_methods_block?(node))
         end
 
         def on_defs(node)
@@ -75,6 +75,12 @@ module RuboCop
 
         def inside_eigenclass?(node)
           node.each_ancestor.any? { |a| a.sclass_type? && a.children.first&.self_type? }
+        end
+
+        def inside_class_methods_block?(node)
+          node.each_ancestor(:block).any? do |block_node|
+            block_node.send_node.method_name == :class_methods
+          end
         end
 
         def inside_inner_class?(node)
@@ -127,7 +133,13 @@ module RuboCop
         end
 
         def find_enclosing_scope(node)
-          node.each_ancestor.find { |n| n.class_type? || n.module_type? || n.sclass_type? }
+          node.each_ancestor.find do |n|
+            n.class_type? || n.module_type? || n.sclass_type? || class_methods_block?(n)
+          end
+        end
+
+        def class_methods_block?(node)
+          node.block_type? && node.send_node.method_name == :class_methods
         end
 
         def find_class_or_module(node)

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.3.5] - 2026-03-02
+
 Fixed: `PublicMethodHasSpec` now correctly recognizes `private` declarations inside `included do`, `class_eval do`, and `module_eval do` blocks as visibility scopes
 
 ## [1.3.4] - 2026-02-23

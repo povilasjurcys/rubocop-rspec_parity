@@ -477,6 +477,179 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         RUBY
       end
     end
+
+    context "when method is private inside included do block" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Trackable
+            extend ActiveSupport::Concern
+
+            included do
+              private
+
+              def perform
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside included do block with multiple methods" do
+      it "does not register an offense for any private method" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module Trackable
+            extend ActiveSupport::Concern
+
+            included do
+              private
+
+              def setup_defaults
+              end
+
+              def reset_counters
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is public inside included do block" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense for the public method" do
+        expect_offense(<<~RUBY, source_path)
+          module Trackable
+            extend ActiveSupport::Concern
+
+            included do
+              def perform
+              ^^^^^^^^^^^ #{msg("perform")}
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when included do block has mixed visibility" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense only for public methods" do
+        expect_offense(<<~RUBY, source_path)
+          module Trackable
+            extend ActiveSupport::Concern
+
+            included do
+              def public_method
+              ^^^^^^^^^^^^^^^^^ #{msg("public_method")}
+              end
+
+              private
+
+              def private_method
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside included do block but public methods exist in module" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense only for the module-level public method" do
+        expect_offense(<<~RUBY, source_path)
+          module Trackable
+            extend ActiveSupport::Concern
+
+            def module_public_method
+            ^^^^^^^^^^^^^^^^^^^^^^^^ #{msg("module_public_method")}
+            end
+
+            included do
+              private
+
+              def private_method
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside class_eval block" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            SomeModule.class_eval do
+              private
+
+              def internal_method
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside module_eval block" do
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class User
+            SomeModule.module_eval do
+              private
+
+              def internal_method
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when class_eval block has mixed visibility" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense only for public methods" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            SomeModule.class_eval do
+              def public_method
+              ^^^^^^^^^^^^^^^^^ #{msg("public_method")}
+              end
+
+              private
+
+              def private_method
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when method is private inside class_eval but public methods exist in class" do
+      before { allow(File).to receive(:read).with(spec_path).and_return("") }
+
+      it "registers an offense only for the class-level public method" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            def class_public_method
+            ^^^^^^^^^^^^^^^^^^^^^^^ #{msg("class_public_method")}
+            end
+
+            SomeModule.class_eval do
+              private
+
+              def private_method
+              end
+            end
+          end
+        RUBY
+      end
+    end
   end
 
   describe "spec pattern matching" do

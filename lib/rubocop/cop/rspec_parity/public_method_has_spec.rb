@@ -134,12 +134,21 @@ module RuboCop
 
         def find_enclosing_scope(node)
           node.each_ancestor.find do |n|
-            n.class_type? || n.module_type? || n.sclass_type? || class_methods_block?(n)
+            n.class_type? || n.module_type? || n.sclass_type? || class_methods_block?(n) || included_block?(n) ||
+              eval_block?(n)
           end
         end
 
         def class_methods_block?(node)
           node.block_type? && node.send_node.method_name == :class_methods
+        end
+
+        def included_block?(node)
+          node.block_type? && node.send_node.method_name == :included
+        end
+
+        def eval_block?(node)
+          node.block_type? && %i[class_eval module_eval].include?(node.send_node.method_name)
         end
 
         def find_class_or_module(node)

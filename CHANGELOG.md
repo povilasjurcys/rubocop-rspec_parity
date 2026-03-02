@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Fixed: `PublicMethodHasSpec` now correctly recognizes `private` declarations inside `included do`, `class_eval do`, and `module_eval do` blocks as visibility scopes
+
 ## [1.3.4] - 2026-02-23
 
 Added: `PublicMethodHasSpec` now treats methods inside `class_methods do` blocks (ActiveSupport::Concern) as class methods, expecting `.method_name` in specs

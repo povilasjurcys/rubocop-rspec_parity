@@ -1,40 +1,32 @@
 # Default configuration for rubocop-rspec_parity
 
 # Department-level shared configuration for all RSpecParity cops.
-# Cop-level settings override these when explicitly set per-cop.
+# Set these in your .rubocop.yml under RSpecParity: to share across all cops.
+# Supported keys: SpecFilePathMappings, DescribeAliases, SkipMethodDescribeFor,
+# Include, Exclude.
+# Department-level values override cop-level defaults.
+# Cop-level values set explicitly in your .rubocop.yml override department-level.
 RSpecParity:
-  SpecFilePathMappings:
-    'app/': ['spec/']
-  DescribeAliases: {}
-  SkipMethodDescribeFor: []
+  Include:
+    - 'app/**/*.rb'
+  Exclude:
+    - 'app/assets/**/*'
+    - 'app/views/**/*'
+    - 'app/javascript/**/*'
 
 RSpecParity/FileHasSpec:
   Description: 'Checks that each Ruby file in the app directory has a corresponding spec file.'
   Enabled: true
-  Include:
-    - 'app/**/*.rb'
-  Exclude:
-    - 'app/assets/**/*'
-    - 'app/views/**/*'
-    - 'app/javascript/**/*'
 
 RSpecParity/PublicMethodHasSpec:
   Description: 'Checks that each public method has a corresponding spec test.'
   Enabled: true
-  Include:
-    - 'app/**/*.rb'
-  Exclude:
-    - 'app/assets/**/*'
-    - 'app/views/**/*'
-    - 'app/javascript/**/*'
+  SkipMethodDescribeFor: []
+  DescribeAliases: {}
 
 RSpecParity/SufficientContexts:
   Description: 'Ensures specs have at least as many contexts as the method has branches.'
   Enabled: true
   IgnoreMemoization: true
-  Include:
-    - 'app/**/*.rb'
-  Exclude:
-    - 'app/assets/**/*'
-    - 'app/views/**/*'
-    - 'app/javascript/**/*'
+  SkipMethodDescribeFor: []
+  DescribeAliases: {}

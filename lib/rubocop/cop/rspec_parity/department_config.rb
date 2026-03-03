@@ -7,6 +7,12 @@ module RuboCop
       # Provides config resolution (cop-level > department-level > default),
       # spec file path mappings, and shared describe aliases / skip paths.
       module DepartmentConfig
+        SHARED_CONFIG_DEFAULTS = {
+          "SpecFilePathMappings" => { "app/" => ["spec/"] },
+          "DescribeAliases" => {},
+          "SkipMethodDescribeFor" => []
+        }.freeze
+
         private
 
         def department_config
@@ -14,15 +20,15 @@ module RuboCop
         end
 
         def spec_file_path_mappings
-          resolve_config("SpecFilePathMappings", { "app/" => ["spec/"] })
+          resolve_config("SpecFilePathMappings")
         end
 
         def shared_describe_aliases
-          resolve_config("DescribeAliases", {})
+          resolve_config("DescribeAliases")
         end
 
         def shared_skip_method_describe_paths
-          resolve_config("SkipMethodDescribeFor", [])
+          resolve_config("SkipMethodDescribeFor")
         end
 
         def expected_spec_paths(source_path = nil) # rubocop:disable Metrics/MethodLength
@@ -55,14 +61,17 @@ module RuboCop
           root ? spec_path.sub("#{root}/", "") : spec_path
         end
 
-        def resolve_config(key, default)
-          if cop_config.key?(key)
-            cop_config[key]
-          elsif department_config.key?(key)
-            department_config[key]
-          else
-            default
-          end
+        # Precedence: cop-level user override > department-level > default.
+        # Detects cop-level user overrides by comparing against the known default.
+        def resolve_config(key)
+          default = SHARED_CONFIG_DEFAULTS[key]
+          cop_value = cop_config.key?(key) ? cop_config[key] : nil
+          user_overrode_cop = !cop_value.nil? && cop_value != default
+
+          return cop_value if user_overrode_cop
+          return department_config[key] if department_config.key?(key)
+
+          cop_value || default
         end
 
         def path_matches_mapping?(source_path, source_dir)

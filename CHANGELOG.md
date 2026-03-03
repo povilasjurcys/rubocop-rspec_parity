@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.4.2] - 2026-03-03
+
+Fixed: `PublicMethodHasSpec` now reports violations even when the spec file does not exist, since a missing spec file means the method is untested
+Fixed: Department-level config keys (`DescribeAliases`, `SkipMethodDescribeFor`) no longer trigger unsupported parameter warnings when overridden at cop level
+Added: `Include` and `Exclude` can now be set at department level (`RSpecParity:`) to apply to all cops
+
 ## [1.4.1] - 2026-03-03
 
 Fixed: `PublicMethodHasSpec` now reports violations even when the spec file does not exist, since a missing spec file means the method is untested

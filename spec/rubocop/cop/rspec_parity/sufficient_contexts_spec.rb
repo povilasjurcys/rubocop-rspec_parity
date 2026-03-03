@@ -1040,4 +1040,141 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       end
     end
   end
+
+  describe "department-level configuration" do
+    # Satisfy the outer before block which references spec_exists/spec_content
+    let(:spec_exists) { true }
+    let(:spec_content) { "" }
+
+    context "with department-level DescribeAliases" do
+      let(:spec_path) { "spec/services/user_creator_spec.rb" }
+      let(:source_path) { "app/services/user_creator.rb" }
+
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "DescribeAliases" => { "#call" => ".invoke" } },
+          "RSpecParity/SufficientContexts" => { "Enabled" => true, "IgnoreMemoization" => true }
+        )
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreator do
+            describe '.invoke' do
+              context 'when valid' do
+              end
+              context 'when invalid' do
+              end
+            end
+          end
+        RUBY
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("spec/services/user_creator_*_spec.rb")
+          .and_return([])
+      end
+
+      it "uses department-level aliases for context counting" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def call(params)
+            if params[:valid]
+              process
+            else
+              raise "Invalid"
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with department-level SkipMethodDescribeFor" do
+      let(:spec_path) { "spec/services/user_creator_spec.rb" }
+      let(:source_path) { "app/services/user_creator.rb" }
+
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "SkipMethodDescribeFor" => ["app/services/**/*"] },
+          "RSpecParity/SufficientContexts" => { "Enabled" => true, "IgnoreMemoization" => true }
+        )
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            context 'when valid' do
+              it 'creates user' do
+              end
+            end
+
+            context 'when invalid' do
+              it 'raises error' do
+              end
+            end
+          end
+        RUBY
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("spec/services/user_creator_*_spec.rb")
+          .and_return([])
+      end
+
+      it "uses department-level skip paths for top-level context counting" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call(params)
+              if params[:valid]
+                create_user
+              else
+                raise "Invalid"
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with department-level SpecFilePathMappings" do
+      let(:spec_path) { "test/services/user_creator_spec.rb" }
+      let(:source_path) { "src/services/user_creator.rb" }
+
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "SpecFilePathMappings" => { "src/" => ["test/"] } },
+          "RSpecParity/SufficientContexts" => { "Enabled" => true, "IgnoreMemoization" => true }
+        )
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob)
+          .with("test/services/user_creator_*_spec.rb")
+          .and_return([])
+      end
+
+      it "uses custom path mappings to find spec files" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

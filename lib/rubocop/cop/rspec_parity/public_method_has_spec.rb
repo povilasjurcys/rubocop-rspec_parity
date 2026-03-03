@@ -13,6 +13,7 @@ module RuboCop
       #   # good - public method `perform` has describe '#perform' in spec
       #
       class PublicMethodHasSpec < Base # rubocop:disable Metrics/ClassLength
+        include DepartmentConfig
         include SpecFileFinder
 
         MSG = "Missing spec for public method `%<method_name>s`. " \
@@ -23,12 +24,6 @@ module RuboCop
         EXCLUDED_HOOK_METHODS = %w[included extended inherited prepended].freeze
         EXCLUDED_PATTERNS = [/^before_/, /^after_/, /^around_/, /^validate_/, /^autosave_/].freeze
         VISIBILITY_METHODS = { private: :private, protected: :protected, public: :public }.freeze
-
-        def initialize(config = nil, options = nil)
-          super
-          @skip_method_describe_paths = cop_config.fetch("SkipMethodDescribeFor", [])
-          @describe_aliases = cop_config.fetch("DescribeAliases", {})
-        end
 
         def on_def(node)
           return unless checkable_method?(node) && public_method?(node)
@@ -207,8 +202,7 @@ module RuboCop
           class_name = extract_class_name(node)
           return unless class_name
 
-          base_spec_path = expected_spec_path
-          spec_paths = find_valid_spec_files(class_name, base_spec_path)
+          spec_paths = find_valid_spec_files(class_name, expected_spec_paths)
           return if spec_paths.empty?
 
           method_name = node.method_name.to_s
@@ -272,30 +266,14 @@ module RuboCop
           ]
         end
 
-        def expected_spec_path
-          processed_source.file_path&.sub("/app/", "/spec/")&.sub(/\.rb$/, "_spec.rb")
-        end
-
-        def relative_spec_path(spec_path)
-          root = find_project_root
-          root ? spec_path.sub("#{root}/", "") : spec_path
-        end
-
-        def find_project_root
-          path = processed_source.file_path
-          return nil if path.nil?
-
-          app_index = path.split("/").index("app")
-          app_index ? path.split("/")[0...app_index].join("/") : nil
-        end
-
         def matches_skip_path?
-          return false if @skip_method_describe_paths.empty?
+          skip_paths = shared_skip_method_describe_paths
+          return false if skip_paths.empty?
 
           file_path = processed_source.file_path
           return false unless file_path
 
-          @skip_method_describe_paths.any? do |pattern|
+          skip_paths.any? do |pattern|
             # Match against both absolute path and relative path
             File.fnmatch?(pattern, file_path, File::FNM_PATHNAME | File::FNM_EXTGLOB) ||
               File.fnmatch?(pattern, extract_relative_path(file_path), File::FNM_PATHNAME | File::FNM_EXTGLOB)

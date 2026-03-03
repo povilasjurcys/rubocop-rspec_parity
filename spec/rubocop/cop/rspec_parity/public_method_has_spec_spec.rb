@@ -2279,4 +2279,143 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
   end
+
+  describe "department-level configuration" do
+    let(:source_path) { "/project/app/services/user_service.rb" }
+    let(:spec_path) { "/project/spec/services/user_service_spec.rb" }
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(spec_path).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("/project/spec/services/user_service_*_spec.rb")
+        .and_return([])
+    end
+
+    context "with department-level DescribeAliases" do
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "DescribeAliases" => { "#call" => ".call" } },
+          "RSpecParity/PublicMethodHasSpec" => { "Enabled" => true }
+        )
+      end
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            describe '.call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "uses department-level aliases" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserService
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with cop-level DescribeAliases overriding department-level" do
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "DescribeAliases" => { "#call" => ".invoke" } },
+          "RSpecParity/PublicMethodHasSpec" => {
+            "Enabled" => true,
+            "DescribeAliases" => { "#call" => ".call" }
+          }
+        )
+      end
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            describe '.call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "uses cop-level aliases (overrides department-level)" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserService
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with department-level SkipMethodDescribeFor" do
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "SkipMethodDescribeFor" => ["app/services/**/*"] },
+          "RSpecParity/PublicMethodHasSpec" => { "Enabled" => true }
+        )
+      end
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            it 'creates a user' do
+            end
+          end
+        RUBY
+      end
+
+      it "uses department-level skip paths" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserService
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "with department-level SpecFilePathMappings" do
+      let(:source_path) { "/project/src/services/user_service.rb" }
+      let(:spec_path) { "/project/test/services/user_service_spec.rb" }
+
+      let(:config) do
+        RuboCop::Config.new(
+          "RSpecParity" => { "SpecFilePathMappings" => { "src/" => ["test/"] } },
+          "RSpecParity/PublicMethodHasSpec" => { "Enabled" => true }
+        )
+      end
+
+      before do
+        allow(File).to receive(:exist?).with(spec_path).and_return(true)
+        allow(Dir).to receive(:glob)
+          .with("/project/test/services/user_service_*_spec.rb")
+          .and_return([])
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            describe '#call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "uses custom path mappings to find spec files" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserService
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

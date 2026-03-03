@@ -1,5 +1,13 @@
 # Default configuration for rubocop-rspec_parity
 
+# Department-level shared configuration for all RSpecParity cops.
+# Cop-level settings override these when explicitly set per-cop.
+RSpecParity:
+  SpecFilePathMappings:
+    'app/': ['spec/']
+  DescribeAliases: {}
+  SkipMethodDescribeFor: []
+
 RSpecParity/FileHasSpec:
   Description: 'Checks that each Ruby file in the app directory has a corresponding spec file.'
   Enabled: true
@@ -13,8 +21,6 @@ RSpecParity/FileHasSpec:
 RSpecParity/PublicMethodHasSpec:
   Description: 'Checks that each public method has a corresponding spec test.'
   Enabled: true
-  SkipMethodDescribeFor: []
-  DescribeAliases: {}
   Include:
     - 'app/**/*.rb'
   Exclude:
@@ -26,8 +32,6 @@ RSpecParity/SufficientContexts:
   Description: 'Ensures specs have at least as many contexts as the method has branches.'
   Enabled: true
   IgnoreMemoization: true
-  SkipMethodDescribeFor: []
-  DescribeAliases: {}
   Include:
     - 'app/**/*.rb'
   Exclude:

@@ -46,22 +46,24 @@ module RuboCop
           filename.split("_").map(&:capitalize).join
         end
 
-        def find_valid_spec_files(class_name, base_spec_path)
-          return [] unless base_spec_path
+        def find_valid_spec_files(class_name, base_spec_paths) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+          base_spec_paths = Array(base_spec_paths)
+          return [] if base_spec_paths.empty?
 
           valid_files = []
 
-          # Always include the base spec file if it exists (maintains original behavior)
-          valid_files << base_spec_path if File.exist?(base_spec_path)
+          base_spec_paths.each do |base_spec_path|
+            next unless base_spec_path
 
-          # Also check for wildcard spec files (e.g., user_updates_spec.rb)
-          # But only include them if they describe the correct class
-          spec_dir = File.dirname(base_spec_path)
-          base_name = File.basename(base_spec_path, "_spec.rb")
-          wildcard_files = Dir.glob(File.join(spec_dir, "#{base_name}_*_spec.rb"))
+            valid_files << base_spec_path if File.exist?(base_spec_path)
 
-          wildcard_files.each do |file|
-            valid_files << file if File.exist?(file) && spec_describes_class?(file, class_name)
+            spec_dir = File.dirname(base_spec_path)
+            base_name = File.basename(base_spec_path, "_spec.rb")
+            wildcard_files = Dir.glob(File.join(spec_dir, "#{base_name}_*_spec.rb"))
+
+            wildcard_files.each do |file|
+              valid_files << file if File.exist?(file) && spec_describes_class?(file, class_name)
+            end
           end
 
           valid_files.uniq
@@ -82,7 +84,7 @@ module RuboCop
         end
 
         def describe_aliases_for(describe_key)
-          value = @describe_aliases[describe_key]
+          value = shared_describe_aliases[describe_key]
           return [] unless value
 
           Array(value).map(&:to_s)

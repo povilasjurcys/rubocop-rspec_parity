@@ -38,6 +38,7 @@ module RuboCop
       #   context 'when creating a regular user' do
       #   end
       class SufficientContexts < Base # rubocop:disable Metrics/ClassLength
+        include DepartmentConfig
         include SpecFileFinder
 
         MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but only %<contexts>d %<context_word>s " \
@@ -65,8 +66,6 @@ module RuboCop
         def initialize(config = nil, options = nil)
           super
           @ignore_memoization = cop_config.fetch("IgnoreMemoization", true)
-          @skip_method_describe_paths = cop_config.fetch("SkipMethodDescribeFor", [])
-          @describe_aliases = cop_config.fetch("DescribeAliases", {})
         end
 
         def on_def(node)
@@ -89,8 +88,7 @@ module RuboCop
           class_name = extract_class_name(node)
           return unless class_name
 
-          base_spec_path = spec_file_path
-          spec_files = find_valid_spec_files(class_name, base_spec_path)
+          spec_files = find_valid_spec_files(class_name, expected_spec_paths)
           return if spec_files.empty?
 
           # Aggregate contexts from all valid spec files
@@ -141,12 +139,6 @@ module RuboCop
 
         def source_file_path
           processed_source.path
-        end
-
-        def spec_file_path
-          path = processed_source.path
-          # Handle both absolute and relative paths
-          path.sub(%r{/app/}, "/spec/").sub(%r{^app/}, "spec/").sub(/\.rb$/, "_spec.rb")
         end
 
         def count_branches(node)
@@ -372,12 +364,13 @@ module RuboCop
         end
 
         def matches_skip_path?
-          return false if @skip_method_describe_paths.empty?
+          skip_paths = shared_skip_method_describe_paths
+          return false if skip_paths.empty?
 
           path = processed_source.path
           return false unless path
 
-          @skip_method_describe_paths.any? do |pattern|
+          skip_paths.any? do |pattern|
             File.fnmatch?(pattern, path, File::FNM_PATHNAME | File::FNM_EXTGLOB)
           end
         end

@@ -11,17 +11,20 @@ module RuboCop
       #   # good - app/models/user.rb has a matching spec/models/user_spec.rb
       #
       class FileHasSpec < Base
+        include DepartmentConfig
+
         MSG = "Missing spec file. Expected %<spec_path>s to exist"
 
         def on_new_investigation
           return unless should_check_file?
 
-          spec_path = expected_spec_path
-          return if File.exist?(spec_path)
+          spec_paths = expected_spec_paths
+          return if spec_paths.empty?
+          return if spec_paths.any? { |path| File.exist?(path) }
 
           add_offense(
             processed_source.ast || processed_source.tokens.first,
-            message: format(MSG, spec_path: relative_spec_path(spec_path))
+            message: format(MSG, spec_path: relative_spec_path(spec_paths.first))
           )
         end
 
@@ -29,20 +32,9 @@ module RuboCop
 
         def should_check_file?
           path = processed_source.file_path
-          path&.include?("/app/") && !path.end_with?("_spec.rb")
-        end
+          return false unless path && !path.end_with?("_spec.rb")
 
-        def expected_spec_path
-          processed_source.file_path.sub("/app/", "/spec/").sub(/\.rb$/, "_spec.rb")
-        end
-
-        def relative_spec_path(spec_path)
-          parts = processed_source.file_path.split("/")
-          app_index = parts.index("app")
-          return spec_path unless app_index
-
-          root = parts[0...app_index].join("/")
-          spec_path.sub("#{root}/", "")
+          matches_any_mapping?(path)
         end
       end
     end

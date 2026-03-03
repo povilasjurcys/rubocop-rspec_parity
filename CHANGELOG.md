@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.4.1] - 2026-03-03
+
+Fixed: `PublicMethodHasSpec` now reports violations even when the spec file does not exist, since a missing spec file means the method is untested
+
 ## [1.4.0] - 2026-03-03
 
 Added: `FileHasSpec` cop that checks each app file has a corresponding spec file

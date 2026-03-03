@@ -202,10 +202,16 @@ module RuboCop
           class_name = extract_class_name(node)
           return unless class_name
 
-          spec_paths = find_valid_spec_files(class_name, expected_spec_paths)
-          return if spec_paths.empty?
-
+          all_expected = expected_spec_paths
+          spec_paths = find_valid_spec_files(class_name, all_expected)
           method_name = node.method_name.to_s
+
+          if spec_paths.empty?
+            # No spec file exists — public method is untested
+            report_path = all_expected.first
+            add_method_offense(node, method_name, report_path, instance_method: instance_method) if report_path
+            return
+          end
 
           # Check if relaxed validation applies
           if matches_skip_path? && count_public_methods(node) == 1

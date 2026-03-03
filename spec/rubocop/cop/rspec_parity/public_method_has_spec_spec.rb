@@ -159,10 +159,11 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
     context "when spec file does not exist" do
       before { allow(File).to receive(:exist?).with(spec_path).and_return(false) }
 
-      it "does not register an offense" do
-        expect_no_offenses(<<~RUBY, source_path)
+      it "registers an offense" do
+        expect_offense(<<~RUBY, source_path)
           class User
             def perform
+            ^^^^^^^^^^^ #{msg("perform")}
             end
           end
         RUBY

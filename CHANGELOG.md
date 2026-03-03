@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.4.0] - 2026-03-03
+
 Added: `FileHasSpec` cop that checks each app file has a corresponding spec file
 Added: Department-level shared configuration (`SpecFilePathMappings`, `DescribeAliases`, `SkipMethodDescribeFor`) for all RSpecParity cops
 

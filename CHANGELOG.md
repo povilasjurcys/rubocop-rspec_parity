@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: `FileHasSpec` cop that checks each app file has a corresponding spec file
+
 ## [1.3.5] - 2026-03-02
 
 Fixed: `PublicMethodHasSpec` now correctly recognizes `private` declarations inside `included do`, `class_eval do`, and `module_eval do` blocks as visibility scopes

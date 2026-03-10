@@ -13,6 +13,10 @@ RSpecParity:
     - 'app/assets/**/*'
     - 'app/views/**/*'
     - 'app/javascript/**/*'
+  SpecFilePathMappings:
+    app/: ['spec/']
+  DescribeAliases: {}
+  SkipMethodDescribeFor: []
 
 RSpecParity/FileHasSpec:
   Description: 'Checks that each Ruby file in the app directory has a corresponding spec file.'

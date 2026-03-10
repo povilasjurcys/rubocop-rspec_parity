@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.4.3] - 2026-03-10
+
+Fixed: Department-level custom config keys (`SpecFilePathMappings`, `DescribeAliases`, `SkipMethodDescribeFor`) no longer trigger "unsupported parameter" warnings
+
 ## [1.4.2] - 2026-03-03
 
 Fixed: `PublicMethodHasSpec` now reports violations even when the spec file does not exist, since a missing spec file means the method is untested

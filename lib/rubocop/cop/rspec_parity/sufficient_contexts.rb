@@ -44,7 +44,7 @@ module RuboCop
         MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but only %<contexts>d %<context_word>s " \
               "in spec. Add %<missing>d more %<missing_word>s to cover all branches."
 
-        APP_DIR_PATTERN = %r{/app/}.freeze
+        APP_DIR_PATTERN = %r{/app/}
 
         EXCLUDED_METHODS = %w[initialize].freeze
 

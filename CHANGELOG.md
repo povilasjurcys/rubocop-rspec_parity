@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.4.4] - 2026-03-18
+
+Removed: Hardcoded directory lists in `PublicMethodHasSpec` and `SufficientContexts` cops; file selection now relies entirely on department-level `Include`/`Exclude` config
+
 ## [1.4.3] - 2026-03-10
 
 Fixed: Department-level custom config keys (`SpecFilePathMappings`, `DescribeAliases`, `SkipMethodDescribeFor`) no longer trigger "unsupported parameter" warnings

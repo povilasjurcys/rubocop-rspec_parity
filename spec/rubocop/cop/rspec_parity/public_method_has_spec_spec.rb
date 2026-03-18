@@ -143,7 +143,6 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-
     context "when spec file does not exist" do
       before { allow(File).to receive(:exist?).with(spec_path).and_return(false) }
 

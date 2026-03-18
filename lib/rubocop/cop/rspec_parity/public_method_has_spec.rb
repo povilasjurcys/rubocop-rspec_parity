@@ -19,7 +19,6 @@ module RuboCop
         MSG = "Missing spec for public method `%<method_name>s`. " \
               "Expected %<expected>s in %<spec_path>s"
 
-
         EXCLUDED_METHODS = %w[initialize].freeze
         EXCLUDED_HOOK_METHODS = %w[included extended inherited prepended].freeze
         EXCLUDED_PATTERNS = [/^before_/, /^after_/, /^around_/, /^validate_/, /^autosave_/].freeze

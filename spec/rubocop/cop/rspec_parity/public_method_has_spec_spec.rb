@@ -143,18 +143,6 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
-    context "when file is in non-covered directory" do
-      let(:source_path) { "/project/app/views/users.rb" }
-
-      it "does not check the file" do
-        expect_no_offenses(<<~RUBY, source_path)
-          class User
-            def perform
-            end
-          end
-        RUBY
-      end
-    end
 
     context "when spec file does not exist" do
       before { allow(File).to receive(:exist?).with(spec_path).and_return(false) }

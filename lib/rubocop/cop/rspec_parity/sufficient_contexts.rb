@@ -44,14 +44,7 @@ module RuboCop
         MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but only %<contexts>d %<context_word>s " \
               "in spec. Add %<missing>d more %<missing_word>s to cover all branches."
 
-        COVERED_DIRECTORIES = %w[
-          app/models
-          app/controllers
-          app/services
-          app/jobs
-          app/mailers
-          app/helpers
-        ].freeze
+        APP_DIR_PATTERN = %r{/app/}.freeze
 
         EXCLUDED_METHODS = %w[initialize].freeze
 
@@ -125,10 +118,7 @@ module RuboCop
 
         def in_covered_directory?
           path = processed_source.path
-          # Handle both absolute and relative paths
-          COVERED_DIRECTORIES.any? do |dir|
-            path.start_with?(dir) || path.include?("/#{dir}/") || path.match?(%r{/#{Regexp.escape(dir)}$})
-          end
+          path.include?("/app/") || path.match?(%r{^app/})
         end
 
         def excluded_method?(method_name)

@@ -6,7 +6,7 @@ module RuboCop
       # Shared module for reading department-level configuration.
       # Provides config resolution (cop-level > department-level > default),
       # spec file path mappings, and shared describe aliases / skip paths.
-      module DepartmentConfig
+      module DepartmentConfig # rubocop:disable Metrics/ModuleLength
         SHARED_CONFIG_DEFAULTS = {
           "SpecFilePathMappings" => { "app/" => ["spec/"] },
           "DescribeAliases" => {},
@@ -97,6 +97,52 @@ module RuboCop
             return parts[0...dir_index].join("/")
           end
           nil
+        end
+
+        # Detects if a method is inside a module that makes instance methods
+        # callable as module-level methods (e.g., extend self, module_function).
+        def module_with_dual_access?(node)
+          enclosing = find_class_or_module(node)
+          return false unless enclosing&.module_type?
+
+          extend_self?(enclosing) || module_function_applies?(enclosing, node)
+        end
+
+        def extend_self?(module_node)
+          return false unless module_node.body
+
+          module_body_children(module_node).any? do |child|
+            child.send_type? && child.method_name == :extend && child.arguments.size == 1 &&
+              child.first_argument.self_type?
+          end
+        end
+
+        def module_function_applies?(module_node, target_node)
+          return false unless module_node.body
+
+          children = module_body_children(module_node)
+
+          targeted_module_function?(children, target_node) || section_module_function?(children, target_node)
+        end
+
+        def targeted_module_function?(children, target_node)
+          children.any? do |child|
+            child.send_type? && child.method_name == :module_function &&
+              child.arguments.any? { |arg| arg.sym_type? && arg.value == target_node.method_name }
+          end
+        end
+
+        def section_module_function?(children, target_node)
+          section_active = false
+          children.each do |child|
+            section_active = true if child.send_type? && child.method_name == :module_function && child.arguments.empty?
+            return true if section_active && child == target_node
+          end
+          false
+        end
+
+        def module_body_children(module_node)
+          module_node.body.begin_type? ? module_node.body.children : [module_node.body]
         end
       end
     end

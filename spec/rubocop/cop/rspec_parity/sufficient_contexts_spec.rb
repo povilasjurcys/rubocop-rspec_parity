@@ -1041,6 +1041,109 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
     end
   end
 
+  describe "modules with dual access methods" do
+    let(:spec_exists) { true }
+
+    before do
+      allow(Dir).to receive(:glob).and_call_original
+      allow(Dir).to receive(:glob)
+        .with("spec/services/user_creator_*_spec.rb")
+        .and_return([])
+    end
+
+    context "when module uses extend self and spec uses '.method'" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '.create_user' do
+              context 'when admin' do
+              end
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserCreator
+            extend self
+
+            def create_user(params)
+              if params[:admin]
+                create_admin
+              else
+                create_regular_user
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when module uses module_function and spec uses '.method'" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '.create_user' do
+              context 'when admin' do
+              end
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserCreator
+            module_function
+
+            def create_user(params)
+              if params[:admin]
+                create_admin
+              else
+                create_regular_user
+              end
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when module uses targeted module_function and spec uses '.method'" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '.create_user' do
+              context 'when admin' do
+              end
+              context 'when not admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          module UserCreator
+            def create_user(params)
+              if params[:admin]
+                create_admin
+              else
+                create_regular_user
+              end
+            end
+            module_function :create_user
+          end
+        RUBY
+      end
+    end
+  end
+
   describe "department-level configuration" do
     # Satisfy the outer before block which references spec_exists/spec_content
     let(:spec_exists) { true }

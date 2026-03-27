@@ -4,8 +4,12 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
   let(:spec_path) { "/project/spec/models/user_spec.rb" }
   let(:source_path) { "/project/app/models/user.rb" }
 
-  def msg(method_name, spec_file = "spec/models/user_spec.rb", prefix: "#", aliases: [])
-    expected = ["describe '#{prefix}#{method_name}'"]
+  def msg(method_name, spec_file = "spec/models/user_spec.rb", prefix: "#", aliases: [], flexible: false)
+    expected = if flexible
+                 ["describe '##{method_name}'", "describe '.#{method_name}'"]
+               else
+                 ["describe '#{prefix}#{method_name}'"]
+               end
     aliases.each { |a| expected << "describe '#{a}'" }
     "Missing spec for public method `#{method_name}`. " \
       "Expected #{expected.join(" or ")} in #{spec_file}"
@@ -2400,6 +2404,225 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
         expect_no_offenses(<<~RUBY, source_path)
           class UserService
             def call
+            end
+          end
+        RUBY
+      end
+    end
+  end
+
+  describe "modules with dual access methods" do
+    context "with extend self" do
+      context "when spec uses '#method' notation" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+              describe '#perform' do
+                it 'works' do
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "does not register an offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            module User
+              extend self
+
+              def perform
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when spec uses '.method' notation" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+              describe '.perform' do
+                it 'works' do
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "does not register an offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            module User
+              extend self
+
+              def perform
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when spec has no method describe" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+            end
+          RUBY
+        end
+
+        it "registers an offense with both prefix options" do
+          expect_offense(<<~RUBY, source_path)
+            module User
+              extend self
+
+              def perform
+              ^^^^^^^^^^^ #{msg("perform", flexible: true)}
+              end
+            end
+          RUBY
+        end
+      end
+    end
+
+    context "with module_function (section-level)" do
+      context "when spec uses '.method' notation" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+              describe '.perform' do
+                it 'works' do
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "does not register an offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            module User
+              module_function
+
+              def perform
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when spec uses '#method' notation" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+              describe '#perform' do
+                it 'works' do
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "does not register an offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            module User
+              module_function
+
+              def perform
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when method is before module_function" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+            end
+          RUBY
+        end
+
+        it "does not apply flexible prefix for methods before module_function" do
+          expect_offense(<<~RUBY, source_path)
+            module User
+              def perform
+              ^^^^^^^^^^^ #{msg("perform")}
+              end
+
+              module_function
+
+              def other_method
+              ^^^^^^^^^^^^^^^^ #{msg("other_method", flexible: true)}
+              end
+            end
+          RUBY
+        end
+      end
+    end
+
+    context "with module_function (targeted)" do
+      context "when spec uses '.method' notation for targeted method" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+              describe '.perform' do
+                it 'works' do
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "does not register an offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            module User
+              def perform
+              end
+              module_function :perform
+            end
+          RUBY
+        end
+      end
+
+      context "when only specific method is targeted" do
+        before do
+          allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+            describe User do
+            end
+          RUBY
+        end
+
+        it "applies flexible prefix only to the targeted method" do
+          expect_offense(<<~RUBY, source_path)
+            module User
+              def perform
+              ^^^^^^^^^^^ #{msg("perform", flexible: true)}
+              end
+
+              def other_method
+              ^^^^^^^^^^^^^^^^ #{msg("other_method")}
+              end
+
+              module_function :perform
+            end
+          RUBY
+        end
+      end
+    end
+
+    context "when class (not module) uses extend self" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe User do
+          end
+        RUBY
+      end
+
+      it "does not apply flexible prefix" do
+        expect_offense(<<~RUBY, source_path)
+          class User
+            extend self
+
+            def perform
+            ^^^^^^^^^^^ #{msg("perform")}
             end
           end
         RUBY

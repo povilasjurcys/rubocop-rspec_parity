@@ -28,7 +28,9 @@ module RuboCop
           return unless checkable_method?(node) && public_method?(node)
           return if inside_inner_class?(node)
 
-          check_method_has_spec(node, instance_method: !inside_eigenclass?(node) && !inside_class_methods_block?(node))
+          instance_method = !inside_eigenclass?(node) && !inside_class_methods_block?(node)
+          flexible_prefix = instance_method && module_with_dual_access?(node)
+          check_method_has_spec(node, instance_method: instance_method, flexible_prefix: flexible_prefix)
         end
 
         def on_defs(node)
@@ -197,7 +199,7 @@ module RuboCop
         end
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-        def check_method_has_spec(node, instance_method:)
+        def check_method_has_spec(node, instance_method:, flexible_prefix: false)
           class_name = extract_class_name(node)
           return unless class_name
 
@@ -208,7 +210,10 @@ module RuboCop
           if spec_paths.empty?
             # No spec file exists — public method is untested
             report_path = all_expected.first
-            add_method_offense(node, method_name, report_path, instance_method: instance_method) if report_path
+            if report_path
+              add_method_offense(node, method_name, report_path, instance_method: instance_method,
+                                                                 flexible_prefix: flexible_prefix)
+            end
             return
           end
 
@@ -216,42 +221,59 @@ module RuboCop
           if matches_skip_path? && count_public_methods(node) == 1
             # For single-method classes in configured paths, just check for examples
             return if spec_paths.any? { |spec_path| spec_has_examples?(spec_path, class_name) }
-          elsif spec_paths.any? { |spec_path| spec_covers_method?(spec_path, method_name, instance_method) }
+          elsif spec_paths.any? do |sp|
+                  spec_covers_method?(sp, method_name, instance_method, flexible_prefix: flexible_prefix)
+                end
             # Normal validation: check for method describe
             return
           end
 
-          add_method_offense(node, method_name, spec_paths.first, instance_method: instance_method)
+          add_method_offense(node, method_name, spec_paths.first, instance_method: instance_method,
+                                                                  flexible_prefix: flexible_prefix)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-        def spec_covers_method?(spec_path, method_name, instance_method)
+        def spec_covers_method?(spec_path, method_name, instance_method, flexible_prefix: false)
           return true if method_tested_in_spec?(spec_path, method_name, instance_method)
+          return true if flexible_prefix && method_tested_in_spec?(spec_path, method_name, !instance_method)
 
-          prefix = instance_method ? "#" : "."
-          describe_key = "#{prefix}#{method_name}"
-          describe_aliases_for(describe_key).any? do |alias_desc|
-            alias_name = alias_desc.sub(/^[#.]/, "")
-            alias_instance = !alias_desc.start_with?(".")
-            method_tested_in_spec?(spec_path, alias_name, alias_instance)
+          spec_covers_via_aliases?(spec_path, method_name, instance_method, flexible_prefix)
+        end
+
+        def spec_covers_via_aliases?(spec_path, method_name, instance_method, flexible_prefix)
+          prefixes_for(instance_method, flexible_prefix).any? do |prefix|
+            describe_aliases_for("#{prefix}#{method_name}").any? do |alias_desc|
+              alias_name = alias_desc.sub(/^[#.]/, "")
+              method_tested_in_spec?(spec_path, alias_name, !alias_desc.start_with?("."))
+            end
           end
         end
 
-        def add_method_offense(node, method_name, spec_path, instance_method:)
-          prefix = instance_method ? "#" : "."
-          expected = expected_describes(prefix, method_name)
+        def add_method_offense(node, method_name, spec_path, instance_method:, flexible_prefix: false)
+          expected = expected_describes_for(method_name, instance_method, flexible_prefix)
           add_offense(
             node.loc.keyword.join(node.loc.name),
             message: format(MSG, method_name: method_name, expected: expected, spec_path: relative_spec_path(spec_path))
           )
         end
 
-        def expected_describes(prefix, method_name)
-          describes = ["describe '#{prefix}#{method_name}'"]
-          describe_aliases_for("#{prefix}#{method_name}").each do |alias_desc|
-            describes << "describe '#{alias_desc}'"
+        def expected_describes_for(method_name, instance_method, flexible_prefix)
+          describes = []
+          prefixes_for(instance_method, flexible_prefix).each do |prefix|
+            describes << "describe '#{prefix}#{method_name}'"
+            describe_aliases_for("#{prefix}#{method_name}").each do |alias_desc|
+              describes << "describe '#{alias_desc}'"
+            end
           end
           describes.join(" or ")
+        end
+
+        def prefixes_for(instance_method, flexible_prefix)
+          if flexible_prefix
+            ["#", "."]
+          else
+            [instance_method ? "#" : "."]
+          end
         end
 
         def method_tested_in_spec?(spec_path, method_name, instance_method)

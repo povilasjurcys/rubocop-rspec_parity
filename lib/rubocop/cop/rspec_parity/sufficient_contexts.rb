@@ -84,13 +84,17 @@ module RuboCop
           spec_files = find_valid_spec_files(class_name, expected_spec_paths)
           return if spec_files.empty?
 
+          dual_access = node.def_type? && module_with_dual_access?(node)
+
           # Aggregate contexts from all valid spec files
           contexts = if matches_skip_path? && count_public_methods(node) == 1
                        # For single-method classes, count top-level contexts instead
                        spec_files.sum { |spec_file| count_top_level_contexts(File.read(spec_file), class_name) }
                      else
                        # Normal path: look for method describes
-                       spec_files.sum { |spec_file| count_method_contexts(File.read(spec_file), method_name(node)) }
+                       spec_files.sum do |spec_file|
+                         count_method_contexts(File.read(spec_file), method_name(node), dual_access: dual_access)
+                       end
                      end
 
           return if contexts.zero? # Method has no specs at all - PublicMethodHasSpec handles this
@@ -189,11 +193,14 @@ module RuboCop
           when_count + (has_else ? 1 : 0)
         end
 
-        def count_method_contexts(spec_content, mname)
+        def count_method_contexts(spec_content, mname, dual_access: false)
           count = count_contexts_for_method(spec_content, mname)
-          describe_aliases_for("##{mname}").each do |alias_desc|
-            alias_name = alias_desc.sub(/^[#.]/, "")
-            count += count_contexts_for_method(spec_content, alias_name) if alias_name != mname
+          prefixes = dual_access ? ["#", "."] : ["#"]
+          prefixes.each do |prefix|
+            describe_aliases_for("#{prefix}#{mname}").each do |alias_desc|
+              alias_name = alias_desc.sub(/^[#.]/, "")
+              count += count_contexts_for_method(spec_content, alias_name) if alias_name != mname
+            end
           end
           count
         end

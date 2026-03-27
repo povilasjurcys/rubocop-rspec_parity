@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.4.5] - 2026-03-27
+
+Added: Allow both `#method` and `.method` notation in specs for modules using `extend self`, `module_function`, or `module_function :method_name`
+
 ## [1.4.4] - 2026-03-18
 
 Removed: Hardcoded directory lists in `PublicMethodHasSpec` and `SufficientContexts` cops; file selection now relies entirely on department-level `Include`/`Exclude` config

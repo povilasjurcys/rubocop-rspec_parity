@@ -2,6 +2,6 @@
 
 module RuboCop
   module RSpecParity
-    VERSION = "1.4.4"
+    VERSION = "1.4.5"
   end
 end

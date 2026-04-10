@@ -259,11 +259,11 @@ module RuboCop
 
         def matches_method_describe?(line, method_pattern)
           line =~ /^\s*describe\s+['"](?:#|\.)?#{method_pattern}['"]/ ||
-            line =~ /^\s*describe\s+:#{method_pattern}/
+            line =~ /^\s*describe\s+:#{method_pattern}(?!\w)/
         end
 
         def matches_context_pattern?(line, method_pattern)
-          line =~ /^\s*(?:context|describe)\s+.*(?:#|\.)?#{method_pattern}/
+          line =~ /^\s*(?:context|describe)\s+['"](?:#|\.)?#{method_pattern}(?:\s|['"])/
         end
 
         def nested_context?(line)

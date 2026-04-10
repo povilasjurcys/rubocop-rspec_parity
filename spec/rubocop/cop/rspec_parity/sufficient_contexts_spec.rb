@@ -160,6 +160,40 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         end
       RUBY
     end
+
+    context "when method name appears in unrelated context descriptions but has no describe block" do
+      let(:spec_exists) { true }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#call' do
+              context 'when data is present' do
+                it 'processes data' do
+                end
+              end
+              context 'with empty data' do
+                it 'skips processing' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def data
+            if condition_a
+              value_a
+            elsif condition_b
+              value_b
+            else
+              value_c
+            end
+          end
+        RUBY
+      end
+    end
   end
 
   describe "describe blocks with examples but no contexts" do

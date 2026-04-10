@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.4.6] - 2026-04-10
+
+Fixed: Method name matching no longer falsely matches substring occurrences in unrelated context descriptions
+
 ## [1.4.5] - 2026-03-27
 
 Added: Allow both `#method` and `.method` notation in specs for modules using `extend self`, `module_function`, or `module_function :method_name`

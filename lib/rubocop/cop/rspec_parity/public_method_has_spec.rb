@@ -288,7 +288,7 @@ module RuboCop
           [
             /describe\s+['"]#{escaped_prefix}#{escaped_name}['"]/,
             /context\s+['"]#{escaped_prefix}#{escaped_name}['"]/,
-            /it\s+['"](tests?|checks?|verifies?|validates?)\s+#{escaped_name}/i,
+            /it\s+['"](tests?|checks?|verifies?|validates?)\s+#{escaped_name}(?!\w)/i,
             /describe\s+['"]#{escaped_name}['"]/
           ]
         end

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [1.5.0] - 2026-05-21
+
 Added: `SufficientContexts` now inlines branches from private/protected helpers that are called from exactly one site in the same class (controlled by the new `TraceSingleUsePrivateMethods` config key, default `true`). Violation messages list the helpers whose branches were counted.
 
 ## [1.4.6] - 2026-04-10

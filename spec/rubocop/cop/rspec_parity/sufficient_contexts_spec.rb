@@ -1314,4 +1314,253 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       end
     end
   end
+
+  describe "tracing single-use private method branches" do
+    let(:spec_exists) { true }
+
+    context "when public method calls a single-use private helper with branches" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "inflates branch count and lists the helper in the message" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches. (including branches from: build)
+              build(params)
+            end
+
+            private
+
+            def build(params)
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when spec contexts cover the inflated branch count" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+              context 'when regular' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params)
+              build(params)
+            end
+
+            private
+
+            def build(params)
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when the private helper is called from two public methods" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+            describe '#destroy_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not inflate branches for either caller" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params); build(params); end
+            def destroy_user(params); build(params); end
+
+            private
+
+            def build(params)
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when the class contains dynamic dispatch" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not inflate branches and keeps the original message" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params); build(params); end
+            def call_dynamic(name); send(name); end
+
+            private
+
+            def build(params)
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when a branchless helper sits between caller and a branchy helper" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "names only the branchy helper in the message" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches. (including branches from: build)
+              passthrough(params)
+            end
+
+            private
+
+            def passthrough(params)
+              build(params)
+            end
+
+            def build(params)
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when the private helper memoizes with `@var ||= ...`" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not count memoization as a branch (same rule as public methods)" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params)
+              build(params)
+            end
+
+            private
+
+            def build(params)
+              @cached ||= expensive_lookup(params)
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when the private helper has memoization alongside a real branch" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts only the real branch, not the memoization" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches. (including branches from: build)
+              build(params)
+            end
+
+            private
+
+            def build(params)
+              @cached ||= fetch
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when TraceSingleUsePrivateMethods is disabled" do
+      let(:cop_config) { { "TraceSingleUsePrivateMethods" => false } }
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'when admin' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not inflate branches and produces no offense for a single-context spec" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def create_user(params)
+              build(params)
+            end
+
+            private
+
+            def build(params)
+              params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_file_finder"
+require_relative "private_method_call_graph"
 
 module RuboCop
   module Cop
@@ -44,6 +45,8 @@ module RuboCop
         MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but only %<contexts>d %<context_word>s " \
               "in spec. Add %<missing>d more %<missing_word>s to cover all branches."
 
+        TRACED_SUFFIX = " (including branches from: %<traced>s)"
+
         APP_DIR_PATTERN = %r{/app/}
 
         EXCLUDED_METHODS = %w[initialize].freeze
@@ -59,6 +62,8 @@ module RuboCop
         def initialize(config = nil, options = nil)
           super
           @ignore_memoization = cop_config.fetch("IgnoreMemoization", true)
+          @trace_single_use_private = cop_config.fetch("TraceSingleUsePrivateMethods", true)
+          @call_graphs = {}.compare_by_identity
         end
 
         def on_def(node)
@@ -76,6 +81,12 @@ module RuboCop
           return if excluded_method?(method_name(node))
 
           branches = count_branches(node)
+          traced_methods = []
+          if @trace_single_use_private
+            extra = inlined_branches(node)
+            branches += extra.branches
+            traced_methods = extra.traced_methods
+          end
           return if branches < 2 # Only check methods with branches
 
           class_name = extract_class_name(node)
@@ -101,15 +112,28 @@ module RuboCop
           return if contexts >= branches
 
           missing = branches - contexts
-          add_offense(node,
-                      message: format(MSG,
-                                      method_name: method_name(node),
-                                      branches: branches,
-                                      branch_word: pluralize("branch", branches),
-                                      contexts: contexts,
-                                      context_word: pluralize("context", contexts),
-                                      missing: missing,
-                                      missing_word: pluralize("context", missing)))
+          add_offense(node, message: build_message(node, branches, contexts, missing, traced_methods))
+        end
+
+        def build_message(node, branches, contexts, missing, traced_methods)
+          message = format(MSG,
+                           method_name: method_name(node),
+                           branches: branches,
+                           branch_word: pluralize("branch", branches),
+                           contexts: contexts,
+                           context_word: pluralize("context", contexts),
+                           missing: missing,
+                           missing_word: pluralize("context", missing))
+          message += format(TRACED_SUFFIX, traced: traced_methods.join(", ")) if traced_methods.any?
+          message
+        end
+
+        def inlined_branches(node)
+          container = find_class_or_module(node)
+          return PrivateMethodCallGraph::Result.new(0, []) unless container
+
+          graph = (@call_graphs[container] ||= PrivateMethodCallGraph.new(container))
+          graph.inlinable_from(node, method(:count_branches))
         end
 
         def method_name(node)

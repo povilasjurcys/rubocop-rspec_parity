@@ -45,7 +45,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         it "registers an offense" do
           expect_offense(<<~RUBY, source_path)
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
               if params[:admin]
                 create_admin
               else
@@ -213,7 +213,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts direct examples as 1 scenario and registers offense" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             if params[:admin]
               create_admin
             else
@@ -241,10 +241,9 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         RUBY
       end
 
-      it "still counts all direct examples as 1 scenario" do
-        expect_offense(<<~RUBY, source_path)
+      it "counts each direct example as a scenario, covering the 2 branches" do
+        expect_no_offenses(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
             if params[:admin]
               create_admin
             else
@@ -342,7 +341,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "does not count nested it blocks as additional context" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             if params[:admin]
               create_admin
             else
@@ -369,7 +368,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "also counts examples as 1 scenario" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             if params[:admin]
               create_admin
             else
@@ -441,7 +440,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still counts regular branches" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             @cached_value ||= if some_condition
               value_a
             else
@@ -479,7 +478,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still counts regular branches with local var ||=" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             result ||= if some_condition
               value_a
             else
@@ -500,7 +499,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts @var ||= as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             @cached_value ||= expensive_operation
           end
         RUBY
@@ -509,7 +508,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts return @var if defined?(@var) as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             return @cached_value if defined?(@cached_value)
             @cached_value = expensive_operation
           end
@@ -519,7 +518,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts local_var ||= as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             result ||= expensive_operation
             result
           end
@@ -529,7 +528,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts hash[key] ||= as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             @cache[:key] ||= expensive_operation
           end
         RUBY
@@ -575,7 +574,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still detects insufficient contexts" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             if params[:admin]
               create_admin
             else
@@ -662,7 +661,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "does not use contexts from wildcard spec file" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             if params[:admin]
               create_admin
             else
@@ -835,7 +834,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "registers an offense" do
         expect_offense(<<~RUBY, source_path)
           def call(params)
-          ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+          ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
             if params[:valid]
               process
             else
@@ -965,7 +964,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def call(params)
-            ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
+            ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
               if params[:valid]
                 create_user
               else
@@ -990,11 +989,10 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         RUBY
       end
 
-      it "counts as 1 scenario since no contexts" do
-        expect_offense(<<~RUBY, source_path)
+      it "counts each top-level example as a scenario, covering the 2 branches" do
+        expect_no_offenses(<<~RUBY, source_path)
           class UserCreator
             def call(params)
-            ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches.
               if params[:valid]
                 create_user
               else
@@ -1334,7 +1332,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches. (including branches from: build)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand). (including branches from: build)
               build(params)
             end
 
@@ -1455,7 +1453,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches. (including branches from: build)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand). (including branches from: build)
               passthrough(params)
             end
 
@@ -1518,7 +1516,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but only 1 context in spec. Add 1 more context to cover all branches. (including branches from: build)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand). (including branches from: build)
               build(params)
             end
 
@@ -1557,6 +1555,210 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
 
             def build(params)
               params[:admin] ? admin : regular
+            end
+          end
+        RUBY
+      end
+    end
+  end
+
+  # A compound boolean condition needs more than one scenario to exercise: each
+  # operand must be shown to independently affect the outcome (condition /
+  # MC/DC coverage). The cop therefore counts each `&&` / `||` as a branch on
+  # top of the conditional it belongs to, so a decision with N conditions
+  # requires N + 1 scenarios -- the standard MC/DC lower bound. These specs
+  # characterize that intentional counting against a single-condition baseline.
+  describe "compound boolean conditions require a scenario per operand (MC/DC)" do
+    let(:spec_exists) { true }
+
+    context "with a single condition" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when a is truthy' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "needs 2 scenarios (a truthy, a falsey)" do
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(a)
+          ^^^^^^^^^^^^^^^ Method `allowed?` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            "yes" if a
+          end
+        RUBY
+      end
+    end
+
+    context "with an `&&` condition" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when a and b are truthy' do
+              end
+              context 'when a is falsey' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "needs 3 scenarios: a&b true, a false (short-circuit), a true & b false" do
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(a, b)
+          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            "yes" if a && b
+          end
+        RUBY
+      end
+    end
+
+    context "with an `||` condition" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when a is truthy' do
+              end
+              context 'when a is falsey but b is truthy' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "needs 3 scenarios: a true (short-circuit), a false & b true, both false" do
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(a, b)
+          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            "yes" if a || b
+          end
+        RUBY
+      end
+    end
+
+    context "with three conditions `a && b && c`" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when all truthy' do
+              end
+              context 'when a falsey' do
+              end
+              context 'when b falsey' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "needs N + 1 = 4 scenarios for 3 conditions" do
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(a, b, c)
+          ^^^^^^^^^^^^^^^^^^^^^ Method `allowed?` has 4 branches but the spec covers only 3 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            "yes" if a && b && c
+          end
+        RUBY
+      end
+    end
+  end
+
+  # The unit of coverage is a test scenario, which is naturally expressed as an
+  # `it`/`example`, not necessarily a `context`. MC/DC cases for a compound
+  # condition are usually sibling examples inside one context, so examples count
+  # toward the requirement -- a context whose examples each exercise a branch is
+  # sufficient even without one context per branch. Empty placeholder contexts
+  # still count, so this never under-counts relative to context-only counting.
+  describe "counting `it` examples as scenarios" do
+    let(:spec_exists) { true }
+
+    context "when one context holds an example per branch" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'permissions' do
+                it 'creates an admin' do
+                end
+                it 'creates a regular user' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "treats the two examples as two scenarios and registers no offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when examples sit directly under the method describe" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              it 'creates an admin' do
+              end
+              it 'creates a moderator' do
+              end
+              it 'creates a regular user' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts each example, covering a 3-branch method" do
+        expect_no_offenses(<<~RUBY, source_path)
+          def create_user(params)
+            if params[:admin]
+              create_admin
+            elsif params[:moderator]
+              create_moderator
+            else
+              create_regular_user
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "when there are fewer examples than branches" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#create_user' do
+              context 'permissions' do
+                it 'creates an admin' do
+                end
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "still registers an offense" do
+        expect_offense(<<~RUBY, source_path)
+          def create_user(params)
+          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            if params[:admin]
+              create_admin
+            else
+              create_regular_user
             end
           end
         RUBY

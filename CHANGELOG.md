@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+Fixed: `SufficientContexts` now counts each `it`/`example` within a single context as a separate scenario, so specs that cover branches with multiple examples (instead of separate contexts) no longer trigger false violations
+Updated: `SufficientContexts` violation message now explains that each branch needs one `context` or `it`, and that compound conditions like `a && b` need a scenario per operand
+
 ## [1.5.0] - 2026-05-21
 
 Added: `SufficientContexts` now inlines branches from private/protected helpers that are called from exactly one site in the same class (controlled by the new `TraceSingleUsePrivateMethods` config key, default `true`). Violation messages list the helpers whose branches were counted.

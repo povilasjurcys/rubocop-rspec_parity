@@ -42,8 +42,9 @@ module RuboCop
         include DepartmentConfig
         include SpecFileFinder
 
-        MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but only %<contexts>d %<context_word>s " \
-              "in spec. Add %<missing>d more %<missing_word>s to cover all branches."
+        MSG = "Method `%<method_name>s` has %<branches>d %<branch_word>s but the spec covers only " \
+              "%<contexts>d %<scenario_word>s. Add %<missing>d more %<missing_word>s " \
+              "(one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand)."
 
         TRACED_SUFFIX = " (including branches from: %<traced>s)"
 
@@ -58,6 +59,9 @@ module RuboCop
           /^validate_/,
           /^autosave_/
         ].freeze
+
+        # Tallies extracted from a spec's text for a single method describe block.
+        ParsedSpec = Struct.new(:context_count, :example_count, :has_examples, :has_direct_examples)
 
         def initialize(config = nil, options = nil)
           super
@@ -121,9 +125,9 @@ module RuboCop
                            branches: branches,
                            branch_word: pluralize("branch", branches),
                            contexts: contexts,
-                           context_word: pluralize("context", contexts),
+                           scenario_word: pluralize("scenario", contexts),
                            missing: missing,
-                           missing_word: pluralize("context", missing))
+                           missing_word: pluralize("scenario", missing))
           message += format(TRACED_SUFFIX, traced: traced_methods.join(", ")) if traced_methods.any?
           message
         end
@@ -231,21 +235,38 @@ module RuboCop
 
         def count_contexts_for_method(spec_content, method_name)
           method_pattern = Regexp.escape(method_name)
-          context_count, has_examples, has_direct_examples = parse_spec_content(spec_content, method_pattern)
+          result = parse_spec_content(spec_content, method_pattern)
 
-          if context_count.positive? && has_direct_examples
-            context_count + 1
-          elsif context_count.zero? && has_examples
-            1
-          else
-            context_count
-          end
+          scenario_count(
+            result.context_count, result.example_count,
+            has_examples: result.has_examples, has_direct_examples: result.has_direct_examples
+          )
+        end
+
+        # A test scenario is the smaller unit between "a context block" and "an
+        # `it`/`example`". A single context whose examples each exercise a branch
+        # covers as many scenarios as it has examples, so the scenario count is
+        # the larger of the context-based count and the raw example count. Empty
+        # placeholder contexts (no examples) still count via the context-based
+        # path, so this never under-counts relative to the old behaviour.
+        def scenario_count(context_count, example_count, has_examples:, has_direct_examples:)
+          context_based =
+            if context_count.positive? && has_direct_examples
+              context_count + 1
+            elsif context_count.zero? && has_examples
+              1
+            else
+              context_count
+            end
+
+          [context_based, example_count].max
         end
 
         # rubocop:disable Metrics/MethodLength
         def parse_spec_content(spec_content, method_pattern) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
           in_method_block = false
           context_count = 0
+          example_count = 0
           has_examples = false
           has_direct_examples = false
           base_indent = 0
@@ -269,6 +290,7 @@ module RuboCop
                 context_count += 1
               elsif nested_example?(line)
                 has_examples = true
+                example_count += 1
                 child_indent ||= current_indent
                 has_direct_examples = true if current_indent == child_indent
               end
@@ -277,7 +299,7 @@ module RuboCop
             end
           end
 
-          [context_count, has_examples, has_direct_examples]
+          ParsedSpec.new(context_count, example_count, has_examples, has_direct_examples)
         end
         # rubocop:enable Metrics/MethodLength
 
@@ -307,7 +329,6 @@ module RuboCop
 
           case word
           when "branch" then "branches"
-          when "context" then "contexts"
           else "#{word}s"
           end
         end
@@ -447,6 +468,7 @@ module RuboCop
           # Count contexts/describes and examples at the top level (under class describe)
           base_indent = lines[describe_line_index].match(/^(\s*)/)[1].length
           context_count = 0
+          example_count = 0
           has_examples = false
           has_direct_examples = false
           child_indent = nil
@@ -462,18 +484,13 @@ module RuboCop
               context_count += 1
             elsif line.match?(/^\s*(?:it|example|specify)\s+/)
               has_examples = true
+              example_count += 1
               child_indent ||= indent
               has_direct_examples = true if indent == child_indent
             end
           end
 
-          if context_count.positive? && has_direct_examples
-            context_count + 1
-          elsif context_count.zero? && has_examples
-            1
-          else
-            context_count
-          end
+          scenario_count(context_count, example_count, has_examples:, has_direct_examples:)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       end

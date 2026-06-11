@@ -63,6 +63,24 @@ module RuboCop
         # Tallies extracted from a spec's text for a single method describe block.
         ParsedSpec = Struct.new(:context_count, :example_count, :has_examples, :has_direct_examples)
 
+        # Branch tally split into guard-clause "fire" branches vs. every other
+        # branch. A sequence of guard clauses (`return/raise/next ... if/unless`)
+        # shares a single "all guards pass" fall-through, so that happy path is
+        # counted once for the whole method (see #branches_from) rather than once
+        # per guard — which previously inflated guard-heavy methods.
+        BranchTally = Struct.new(:guard, :regular) do
+          def +(other)
+            BranchTally.new(guard + other.guard, regular + other.regular)
+          end
+
+          def total
+            guard + regular
+          end
+        end
+
+        # Node types whose presence as a one-armed `if` body makes it a guard clause.
+        GUARD_TERMINATOR_TYPES = %i[return break next redo retry].freeze
+
         def initialize(config = nil, options = nil)
           super
           @ignore_memoization = cop_config.fetch("IgnoreMemoization", true)
@@ -84,13 +102,14 @@ module RuboCop
           return unless in_covered_directory?
           return if excluded_method?(method_name(node))
 
-          branches = count_branches(node)
+          tally = branch_tally(node)
           traced_methods = []
           if @trace_single_use_private
             extra = inlined_branches(node)
-            branches += extra.branches
+            tally += extra.branch_tally if extra.branch_tally
             traced_methods = extra.traced_methods
           end
+          branches = branches_from(tally)
           return if branches < 2 # Only check methods with branches
 
           class_name = extract_class_name(node)
@@ -134,10 +153,10 @@ module RuboCop
 
         def inlined_branches(node)
           container = find_class_or_module(node)
-          return PrivateMethodCallGraph::Result.new(0, []) unless container
+          return PrivateMethodCallGraph::Result.new(nil, []) unless container
 
           graph = (@call_graphs[container] ||= PrivateMethodCallGraph.new(container))
-          graph.inlinable_from(node, method(:count_branches))
+          graph.inlinable_from(node, method(:branch_tally))
         end
 
         def method_name(node)
@@ -163,17 +182,75 @@ module RuboCop
           processed_source.path
         end
 
-        def count_branches(node)
-          branches = 0
+        # Total scenario count from a tally. Guard clauses share one "all guards
+        # pass" fall-through; count it once, but only when guards are the sole
+        # branching — otherwise the happy path is already represented by the
+        # other branches and adding it would over-count.
+        def branches_from(tally)
+          total = tally.total
+          total += 1 if tally.guard.positive? && tally.regular.zero?
+          total
+        end
+
+        def branch_tally(node) # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+          guard = 0
+          regular = 0
           elsif_nodes = collect_elsif_nodes(node)
+          guard_operators = collect_guard_condition_operators(node)
 
           node.each_descendant do |descendant|
             next if elsif_nodes.include?(descendant)
             next if should_skip_node?(descendant)
 
-            branches += branch_count_for_node(descendant)
+            case descendant.type
+            when :if
+              guard_clause?(descendant) ? guard += 1 : regular += count_if_branches(descendant)
+            when :case then regular += count_case_branches(descendant)
+            when :and, :or then guard_operators.include?(descendant) ? guard += 1 : regular += 1
+            when :or_asgn, :and_asgn then regular += 2 # ||= and &&= create 2 branches (set vs already set)
+            when :send then regular += send_node_branch_count(descendant)
+            end
           end
-          branches
+
+          BranchTally.new(guard, regular)
+        end
+
+        # A guard clause is a one-armed `if`/`unless` whose single body exits the
+        # method early (`return`/`raise`/`next`/`break`/...). Its non-exit path is
+        # the shared fall-through, so it is not a branch of its own.
+        def guard_clause?(node)
+          return false unless node.if_type?
+
+          present = [node.if_branch, node.else_branch].compact
+          return false unless present.size == 1
+
+          guard_terminator?(present.first)
+        end
+
+        def guard_terminator?(node)
+          return false unless node
+          return true if GUARD_TERMINATOR_TYPES.include?(node.type)
+          return true if node.send_type? && (node.method?(:raise) || node.method?(:throw))
+          return guard_terminator?(node.children.last) if node.begin_type?
+
+          false
+        end
+
+        # The `&&`/`||` nodes that live inside a guard clause's condition. Each
+        # such operator is a distinct way for the guard to fire (one scenario per
+        # operand), so it counts as a guard branch rather than an "other" branch.
+        def collect_guard_condition_operators(node)
+          operators = Set.new
+          node.each_descendant(:if) do |if_node|
+            next unless guard_clause?(if_node)
+
+            condition = if_node.condition
+            next unless condition
+
+            operators.add(condition) if condition.and_type? || condition.or_type?
+            condition.each_descendant(:and, :or) { |op| operators.add(op) }
+          end
+          operators
         end
 
         def collect_elsif_nodes(node)
@@ -186,17 +263,6 @@ module RuboCop
 
         def should_skip_node?(node)
           @ignore_memoization && memoization_pattern?(node)
-        end
-
-        def branch_count_for_node(node)
-          case node.type
-          when :if then count_if_branches(node)
-          when :case then count_case_branches(node)
-          when :and, :or then 1
-          when :or_asgn, :and_asgn then 2 # ||= and &&= create 2 branches (set vs already set)
-          when :send then send_node_branch_count(node)
-          else 0
-          end
         end
 
         def send_node_branch_count(node)

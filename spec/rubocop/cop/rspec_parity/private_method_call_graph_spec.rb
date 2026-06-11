@@ -1,5 +1,14 @@
 # frozen_string_literal: true
 
+# The graph aggregates whatever the counter returns, as long as it responds to
+# `+` and `total`. This stand-in mirrors that contract without depending on the
+# cop's own BranchTally.
+GraphTallyDouble = Struct.new(:total) do
+  def +(other)
+    GraphTallyDouble.new(total + other.total)
+  end
+end
+
 RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
   def parse_class(source)
     processed = RuboCop::ProcessedSource.new(source, RUBY_VERSION.to_f)
@@ -19,7 +28,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
         when :case then count += descendant.when_branches.count
         end
       end
-      count
+      GraphTallyDouble.new(count)
     end
   end
 
@@ -114,7 +123,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(0)
+      expect(result.branch_tally).to be_nil
       expect(result.traced_methods).to eq([])
     end
 
@@ -134,7 +143,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["helper"])
     end
 
@@ -149,7 +158,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["b"])
     end
 
@@ -164,7 +173,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call_a"), branch_counter)
-      expect(result.branches).to eq(0)
+      expect(result.branch_tally).to be_nil
       expect(result.traced_methods).to eq([])
     end
 
@@ -177,7 +186,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(0)
+      expect(result.branch_tally).to be_nil
     end
 
     it "inlines protected helpers" do
@@ -190,7 +199,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["helper"])
     end
 
@@ -203,7 +212,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["helper"])
     end
 
@@ -217,7 +226,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["helper"])
     end
 
@@ -232,7 +241,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["b"])
     end
 
@@ -249,7 +258,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
       # a and b each contribute 2 branches; c is called twice so it does not inline
-      expect(result.branches).to eq(4)
+      expect(result.branch_tally.total).to eq(4)
       expect(result.traced_methods).to eq(%w[a b])
     end
 
@@ -264,7 +273,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(0)
+      expect(result.branch_tally).to be_nil
       expect(result.traced_methods).to eq([])
     end
 
@@ -278,7 +287,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
       # def self.call -> helper resolves to a class-level helper, which doesn't exist; instance helper is unrelated
-      expect(result.branches).to eq(0)
+      expect(result.branch_tally).to be_nil
     end
 
     it "traces single-use private class methods" do
@@ -290,7 +299,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::PrivateMethodCallGraph do
       RUBY
       graph = described_class.new(ast)
       result = graph.inlinable_from(find_def(ast, "call"), branch_counter)
-      expect(result.branches).to eq(2)
+      expect(result.branch_tally.total).to eq(2)
       expect(result.traced_methods).to eq(["helper"])
     end
   end

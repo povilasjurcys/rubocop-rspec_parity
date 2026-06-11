@@ -1765,4 +1765,128 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       end
     end
   end
+
+  # Guard clauses (`return`/`raise`/`next ... if/unless`) exit early; their
+  # non-exit path is a single shared fall-through ("all guards pass"). A chain of
+  # guards therefore needs one scenario per way a guard can FIRE, plus ONE shared
+  # happy-path scenario — not one happy path per guard. Each `&&`/`||` inside a
+  # guard condition is still a distinct way to fire (MC/DC per operand).
+  describe "guard clauses share a single all-pass fall-through" do
+    let(:spec_exists) { true }
+
+    context "with a single guard clause" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when x is falsey (guard fires)' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "needs 2 scenarios: guard fires, and the all-pass path" do
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(x)
+          ^^^^^^^^^^^^^^^ Method `allowed?` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            return unless x
+
+            do_thing
+          end
+        RUBY
+      end
+    end
+
+    context "with an `&&` inside the guard condition" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when a is falsey' do
+              end
+              context 'when b is falsey' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "needs 3 scenarios: a fires it, b fires it, and the all-pass path" do
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(a, b)
+          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            return false unless a && b
+
+            true
+          end
+        RUBY
+      end
+    end
+
+    context "with a chain of guard clauses (the real-world case)" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when a is missing' do
+              end
+              context 'when b is missing' do
+              end
+              context 'when a is not ready' do
+              end
+              context 'when b is not ready' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "counts each guard-fire once plus ONE shared happy path (5, not 6)" do
+        # Two guards, each with an `&&` → 4 ways to fire + 1 all-pass = 5.
+        # The all-pass path is counted once, not once per guard.
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(a, b)
+          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 5 branches but the spec covers only 4 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            return false unless a && b
+            return false unless a.ready? && b.ready?
+
+            perform_action
+          end
+        RUBY
+      end
+    end
+
+    context "with a guard clause followed by real branching" do
+      let(:spec_content) do
+        <<~RUBY
+          RSpec.describe UserCreator do
+            describe '#allowed?' do
+              context 'when x is falsey (guard fires)' do
+              end
+              context 'when y is truthy' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "adds no extra happy path: the trailing if/else already covers it (3)" do
+        # guard fire (1) + if/else (2) = 3. No separate all-pass bonus, because
+        # the post-guard branches ARE the happy-path scenarios.
+        expect_offense(<<~RUBY, source_path)
+          def allowed?(x, y)
+          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            return unless x
+
+            if y
+              handle_yes
+            else
+              handle_no
+            end
+          end
+        RUBY
+      end
+    end
+  end
 end

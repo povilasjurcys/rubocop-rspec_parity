@@ -8,7 +8,9 @@ module RuboCop
       # private/protected helpers that are called from exactly one place in
       # the same container.
       class PrivateMethodCallGraph # rubocop:disable Metrics/ClassLength
-        Result = Struct.new(:branches, :traced_methods)
+        # `branch_tally` is whatever the branch_counter returns (a BranchTally),
+        # or nil when nothing was inlined. It must respond to `+` and `total`.
+        Result = Struct.new(:branch_tally, :traced_methods)
 
         DYNAMIC_DISPATCH_SENDS = %i[send public_send __send__].freeze
         EVAL_METHODS = %i[class_eval instance_eval module_eval].freeze
@@ -28,13 +30,13 @@ module RuboCop
         end
 
         def inlinable_from(method_node, branch_counter)
-          return Result.new(0, []) unless @container
-          return Result.new(0, []) if dynamic_dispatch?
+          return Result.new(nil, []) unless @container
+          return Result.new(nil, []) if dynamic_dispatch?
 
           build! unless @built
 
           key = key_for(method_node)
-          return Result.new(0, []) unless @methods.key?(key)
+          return Result.new(nil, []) unless @methods.key?(key)
 
           traverse(key, branch_counter)
         end
@@ -42,7 +44,7 @@ module RuboCop
         private
 
         def traverse(start_key, branch_counter)
-          state = { visited: Set.new([start_key]), total: 0, traced: [] }
+          state = { visited: Set.new([start_key]), tally: nil, traced: [] }
           stack = callees_of(start_key)
           until stack.empty?
             key = stack.shift
@@ -51,7 +53,7 @@ module RuboCop
             visit_callee(key, branch_counter, state)
             stack.concat(callees_of(key))
           end
-          Result.new(state[:total], sorted_names(state[:traced]))
+          Result.new(state[:tally], sorted_names(state[:traced]))
         end
 
         def callees_of(key)
@@ -60,10 +62,10 @@ module RuboCop
 
         def visit_callee(key, branch_counter, state)
           state[:visited] << key
-          count = branch_counter.call(@methods[key][:node])
-          return unless count.positive?
+          tally = branch_counter.call(@methods[key][:node])
+          return unless tally.total.positive?
 
-          state[:total] += count
+          state[:tally] = state[:tally] ? state[:tally] + tally : tally
           state[:traced] << key
         end
 

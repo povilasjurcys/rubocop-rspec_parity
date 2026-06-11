@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.7.0] - 2026-06-11
+
+Fixed: `SufficientContexts` no longer over-counts chains of guard clauses (`return`/`raise`/`next ... if/unless`). A sequence of guards shares a single "all guards pass" fall-through, so that happy path is counted once for the whole method instead of once per guard. Each `&&`/`||` inside a guard condition is still counted as a distinct way for the guard to fire (one scenario per operand).
+
 ## [1.6.0] - 2026-06-11
 
 Fixed: `SufficientContexts` now counts each `it`/`example` within a single context as a separate scenario, so specs that cover branches with multiple examples (instead of separate contexts) no longer trigger false violations

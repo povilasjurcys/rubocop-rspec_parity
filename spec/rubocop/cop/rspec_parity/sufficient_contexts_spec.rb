@@ -45,7 +45,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         it "registers an offense" do
           expect_offense(<<~RUBY, source_path)
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
               if params[:admin]
                 create_admin
               else
@@ -213,7 +213,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts direct examples as 1 scenario and registers offense" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
             if params[:admin]
               create_admin
             else
@@ -341,7 +341,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "does not count nested it blocks as additional context" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
             if params[:admin]
               create_admin
             else
@@ -368,7 +368,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "also counts examples as 1 scenario" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
             if params[:admin]
               create_admin
             else
@@ -440,7 +440,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still counts regular branches" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `some_condition` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers some_condition` to mark it covered.
             @cached_value ||= if some_condition
               value_a
             else
@@ -478,7 +478,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still counts regular branches with local var ||=" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `some_condition` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers some_condition` to mark it covered.
             result ||= if some_condition
               value_a
             else
@@ -499,7 +499,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts @var ||= as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `@cached_value ||= expensive_operation (already set)` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers @cached_value ||= expensive_operation (already set)` to mark it covered.
             @cached_value ||= expensive_operation
           end
         RUBY
@@ -508,7 +508,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts return @var if defined?(@var) as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `defined?(@cached_value)` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers defined?(@cached_value)` to mark it covered.
             return @cached_value if defined?(@cached_value)
             @cached_value = expensive_operation
           end
@@ -518,7 +518,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts local_var ||= as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `result ||= expensive_operation (already set)` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers result ||= expensive_operation (already set)` to mark it covered.
             result ||= expensive_operation
             result
           end
@@ -528,7 +528,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "counts hash[key] ||= as a branch" do
         expect_offense(<<~RUBY, source_path)
           def cached_value
-          ^^^^^^^^^^^^^^^^ Method `cached_value` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `@cache[:key] ||= expensive_operation (already set)` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers @cache[:key] ||= expensive_operation (already set)` to mark it covered.
             @cache[:key] ||= expensive_operation
           end
         RUBY
@@ -574,7 +574,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still detects insufficient contexts" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
             if params[:admin]
               create_admin
             else
@@ -661,7 +661,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "does not use contexts from wildcard spec file" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
             if params[:admin]
               create_admin
             else
@@ -834,7 +834,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "registers an offense" do
         expect_offense(<<~RUBY, source_path)
           def call(params)
-          ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^ Missing coverage for `params[:valid]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:valid]` to mark it covered.
             if params[:valid]
               process
             else
@@ -964,7 +964,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def call(params)
-            ^^^^^^^^^^^^^^^^ Method `call` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+            ^^^^^^^^^^^^^^^^ Missing coverage for `params[:valid]` (line 3) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:valid]` to mark it covered.
               if params[:valid]
                 create_user
               else
@@ -1332,7 +1332,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand). (including branches from: build)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `build: params[:admin]` (build line 9) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers build: params[:admin]` to mark it covered. (including branches from: build)
               build(params)
             end
 
@@ -1453,7 +1453,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand). (including branches from: build)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `build: params[:admin]` (build line 13) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers build: params[:admin]` to mark it covered. (including branches from: build)
               passthrough(params)
             end
 
@@ -1516,7 +1516,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         expect_offense(<<~RUBY, source_path)
           class UserCreator
             def create_user(params)
-            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand). (including branches from: build)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `build: params[:admin]` (build line 10) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers build: params[:admin]` to mark it covered. (including branches from: build)
               build(params)
             end
 
@@ -1586,7 +1586,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "needs 2 scenarios (a truthy, a falsey)" do
         expect_offense(<<~RUBY, source_path)
           def allowed?(a)
-          ^^^^^^^^^^^^^^^ Method `allowed?` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^ Missing coverage for `a` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers a` to mark it covered.
             "yes" if a
           end
         RUBY
@@ -1610,7 +1610,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "needs 3 scenarios: a&b true, a false (short-circuit), a true & b false" do
         expect_offense(<<~RUBY, source_path)
           def allowed?(a, b)
-          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^ Missing coverage for `a && b` (line 2) — 1 of 3 branches untested. Add `context '...' do # rspec_parity:covers a && b` to mark it covered.
             "yes" if a && b
           end
         RUBY
@@ -1634,7 +1634,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "needs 3 scenarios: a true (short-circuit), a false & b true, both false" do
         expect_offense(<<~RUBY, source_path)
           def allowed?(a, b)
-          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^ Missing coverage for `a || b` (line 2) — 1 of 3 branches untested. Add `context '...' do # rspec_parity:covers a || b` to mark it covered.
             "yes" if a || b
           end
         RUBY
@@ -1660,7 +1660,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "needs N + 1 = 4 scenarios for 3 conditions" do
         expect_offense(<<~RUBY, source_path)
           def allowed?(a, b, c)
-          ^^^^^^^^^^^^^^^^^^^^^ Method `allowed?` has 4 branches but the spec covers only 3 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `a && b` (line 2) — 1 of 4 branches untested. Add `context '...' do # rspec_parity:covers a && b` to mark it covered.
             "yes" if a && b && c
           end
         RUBY
@@ -1754,7 +1754,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "still registers an offense" do
         expect_offense(<<~RUBY, source_path)
           def create_user(params)
-          ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered.
             if params[:admin]
               create_admin
             else
@@ -1789,7 +1789,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "needs 2 scenarios: guard fires, and the all-pass path" do
         expect_offense(<<~RUBY, source_path)
           def allowed?(x)
-          ^^^^^^^^^^^^^^^ Method `allowed?` has 2 branches but the spec covers only 1 scenario. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^ Missing coverage for `x` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers x` to mark it covered.
             return unless x
 
             do_thing
@@ -1815,7 +1815,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
       it "needs 3 scenarios: a fires it, b fires it, and the all-pass path" do
         expect_offense(<<~RUBY, source_path)
           def allowed?(a, b)
-          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^ Missing coverage for `a && b` (line 2) — 1 of 3 branches untested. Add `context '...' do # rspec_parity:covers a && b` to mark it covered.
             return false unless a && b
 
             true
@@ -1847,7 +1847,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         # The all-pass path is counted once, not once per guard.
         expect_offense(<<~RUBY, source_path)
           def allowed?(a, b)
-          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 5 branches but the spec covers only 4 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^ Missing coverage for `a && b` (line 2) — 1 of 5 branches untested. Add `context '...' do # rspec_parity:covers a && b` to mark it covered.
             return false unless a && b
             return false unless a.ready? && b.ready?
 
@@ -1876,7 +1876,7 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         # the post-guard branches ARE the happy-path scenarios.
         expect_offense(<<~RUBY, source_path)
           def allowed?(x, y)
-          ^^^^^^^^^^^^^^^^^^ Method `allowed?` has 3 branches but the spec covers only 2 scenarios. Add 1 more scenario (one `context` or `it` per branch; compound conditions like `a && b` need a scenario per operand).
+          ^^^^^^^^^^^^^^^^^^ Missing coverage for `x` (line 2) — 1 of 3 branches untested. Add `context '...' do # rspec_parity:covers x` to mark it covered.
             return unless x
 
             if y
@@ -1886,6 +1886,264 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
             end
           end
         RUBY
+      end
+    end
+
+    describe "rspec_parity:covers annotations" do
+      let(:spec_exists) { true }
+
+      context "when a context is annotated for each branch" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#role_label' do
+                context 'admin' do # rspec_parity:covers user.admin?
+                  it 'is admin'
+                end
+                context 'staff' do # rspec_parity:covers user.staff?
+                  it 'is staff'
+                end
+                context 'guest' do # rspec_parity:covers else
+                  it 'is guest'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "treats every branch as covered and registers no offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            def role_label(user)
+              if user.admin?
+                'admin'
+              elsif user.staff?
+                'staff'
+              else
+                'guest'
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when annotations sit on their own line inside the context" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#role_label' do
+                context 'admin' do
+                  # rspec_parity:covers user.admin?
+                  it 'is admin'
+                end
+                context 'staff' do
+                  # rspec_parity:covers user.staff?
+                  it 'is staff'
+                end
+                context 'guest' do
+                  # rspec_parity:covers else
+                  it 'is guest'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "attributes each standalone annotation to its context and registers no offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            def role_label(user)
+              if user.admin?
+                'admin'
+              elsif user.staff?
+                'staff'
+              else
+                'guest'
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when only some branches are annotated" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#role_label' do
+                context 'admin' do # rspec_parity:covers user.admin?
+                  it 'is admin'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "points at a branch with no covering annotation" do
+          expect_offense(<<~RUBY, source_path)
+            def role_label(user)
+            ^^^^^^^^^^^^^^^^^^^^ Missing coverage for `user.staff?` (line 4) — 2 of 3 branches untested. Add `context '...' do # rspec_parity:covers user.staff?` to mark it covered.
+              if user.admin?
+                'admin'
+              elsif user.staff?
+                'staff'
+              else
+                'guest'
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when an annotated context holds several examples" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#role_label' do
+                context 'admin' do # rspec_parity:covers user.admin?
+                  it 'is admin'
+                  it 'also logs'
+                  it 'also audits'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "collapses the examples into the one annotated branch" do
+          # Without the collapse the three `it`s would count as three scenarios
+          # and mask the two untested branches; the annotation pins them to one.
+          expect_offense(<<~RUBY, source_path)
+            def role_label(user)
+            ^^^^^^^^^^^^^^^^^^^^ Missing coverage for `user.staff?` (line 4) — 2 of 3 branches untested. Add `context '...' do # rspec_parity:covers user.staff?` to mark it covered.
+              if user.admin?
+                'admin'
+              elsif user.staff?
+                'staff'
+              else
+                'guest'
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when an annotation matches no branch" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#create_user' do
+                context 'admin' do # rspec_parity:covers params[:admni]
+                  it 'creates an admin'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "reports the orphan annotation with a did-you-mean suggestion" do
+          expect_offense(<<~RUBY, source_path)
+            def create_user(params)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Missing coverage for `params[:admin]` (line 2) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers params[:admin]` to mark it covered. `rspec_parity:covers` annotation `params[:admni]` matches no branch — did you mean `params[:admin]`?
+              if params[:admin]
+                create_admin
+              else
+                create_regular_user
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when a bare condition annotates a traced private branch" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#visible?' do
+                context 'active or pending' do # rspec_parity:covers user.status == 'active' || user.status == 'pending'
+                  it 'is visible'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "matches without the origin prefix and leaves only the guard uncovered" do
+          expect_offense(<<~RUBY, source_path)
+            class UserCreator
+              def visible?(user)
+              ^^^^^^^^^^^^^^^^^^ Missing coverage for `user` (line 3) — 1 of 2 branches untested. Add `context '...' do # rspec_parity:covers user` to mark it covered. (including branches from: flag_check)
+                return false unless user
+
+                flag_check(user)
+              end
+
+              private
+
+              def flag_check(user)
+                user.status == 'active' || user.status == 'pending'
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when CoversAnnotations is disabled" do
+        let(:cop_config) { { "CoversAnnotations" => false } }
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#create_user' do
+                context 'admin' do # rspec_parity:covers params[:admin]
+                  it 'creates an admin'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "ignores annotations and uses the legacy message" do
+          expect_offense(<<~RUBY, source_path)
+            def create_user(params)
+            ^^^^^^^^^^^^^^^^^^^^^^^ Method `create_user` is missing coverage for 1 of 2 branches.
+              if params[:admin]
+                create_admin
+              else
+                create_regular_user
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when a method has many branches" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#classify' do
+                context 'a' do
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "points at the rspec-parity-cover CLI instead of naming one branch" do
+          expect_offense(<<~RUBY, source_path)
+            def classify(kind)
+            ^^^^^^^^^^^^^^^^^^ 9 of 10 branches untested. Run `bundle exec rspec-parity-cover app/services/user_creator.rb:1` for the full list.
+              case kind
+              when :a then 1
+              when :b then 2
+              when :c then 3
+              when :d then 4
+              when :e then 5
+              when :f then 6
+              when :g then 7
+              when :h then 8
+              when :i then 9
+              else 0
+              end
+            end
+          RUBY
+        end
       end
     end
   end

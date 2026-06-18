@@ -1312,6 +1312,34 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when both def self.call and def call exist (no alias configured)" do
+      let(:cop_config) { { "DescribeAliases" => {} } }
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            describe '.call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "treats the same-named class and instance methods as one, satisfied by a single .call describe" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserService
+            def self.call(**opts)
+              new(**opts).call
+            end
+
+            def call
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when alias does not apply to class methods (def self.call)" do
       let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
 
@@ -2118,6 +2146,63 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
             private
 
             def do_something
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "service object exposing self.call delegating to instance call, spec describes .call" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            describe '.call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "treats #call and .call as one method and registers no offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def self.call(**opts)
+              new(**opts).call
+            end
+
+            def initialize(from:)
+              @from = from
+            end
+
+            def call
+              @from
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "service object exposing self.call delegating to instance call, spec describes #call" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            describe '#call' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "treats #call and .call as one method and registers no offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def self.call(**opts)
+              new(**opts).call
+            end
+
+            def call
             end
           end
         RUBY

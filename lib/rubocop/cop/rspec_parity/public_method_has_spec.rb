@@ -29,7 +29,7 @@ module RuboCop
           return if inside_inner_class?(node)
 
           instance_method = !inside_eigenclass?(node) && !inside_class_methods_block?(node)
-          flexible_prefix = instance_method && module_with_dual_access?(node)
+          flexible_prefix = (instance_method && module_with_dual_access?(node)) || dual_scope_method?(node)
           check_method_has_spec(node, instance_method: instance_method, flexible_prefix: flexible_prefix)
         end
 
@@ -38,7 +38,7 @@ module RuboCop
           return if EXCLUDED_HOOK_METHODS.include?(node.method_name.to_s)
           return if inside_inner_class?(node)
 
-          check_method_has_spec(node, instance_method: false)
+          check_method_has_spec(node, instance_method: false, flexible_prefix: dual_scope_method?(node))
         end
 
         private
@@ -149,6 +149,42 @@ module RuboCop
 
         def find_class_or_module(node)
           node.each_ancestor.find { |n| n.class_type? || n.module_type? }
+        end
+
+        # A class method and an instance method that share a name (the common
+        # service-object `def self.call` -> `new(...).call` plus the `def call`
+        # it delegates to) describe one logical operation. A single
+        # `describe '.call'` or `describe '#call'` should satisfy both, so we
+        # check the method with a flexible `#`/`.` prefix.
+        def dual_scope_method?(node)
+          class_node = find_class_or_module(node)
+          return false unless class_node&.body
+
+          instance_names, class_names = scope_method_names(class_node)
+          name = node.method_name
+          instance_names.include?(name) && class_names.include?(name)
+        end
+
+        def scope_method_names(class_node)
+          instance = []
+          klass = []
+          scope_children(class_node).each { |child| classify_scope_method(child, instance, klass) }
+          [instance, klass]
+        end
+
+        def classify_scope_method(child, instance, klass)
+          case child&.type
+          when :def then instance << child.method_name
+          when :defs then klass << child.method_name if child.children.first&.self_type?
+          when :sclass then collect_eigenclass_method_names(child, klass)
+          end
+        end
+
+        def collect_eigenclass_method_names(node, klass)
+          return unless node.children.first&.self_type? && node.body
+
+          body_children = node.body.begin_type? ? node.body.children : [node.body]
+          body_children.each { |child| klass << child.method_name if child.def_type? }
         end
 
         def targeted_visibility(scope, method_name)

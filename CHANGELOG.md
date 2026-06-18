@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Fixed: `PublicMethodHasSpec` now treats a public class method and a public instance method that share a name (the service-object `def self.call` delegating to `def call`) as one logical method — a single `describe '.call'` or `describe '#call'` satisfies both instead of each requiring its own.
+
 ## [2.0.1] - 2026-06-18
 
 Fixed: `PublicMethodHasSpec` relaxed validation for single-public-method classes (e.g. service objects) no longer passes when the spec's only method-style `describe`/`context` covers a different method — if a method describe is present it must describe the actual public method.

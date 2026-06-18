@@ -1963,6 +1963,69 @@ RSpec.describe RuboCop::Cop::RSpecParity::SufficientContexts, :config do
         end
       end
 
+      context "when one context carries several annotations for the branches it exercises" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#role_label' do
+                context 'privileged' do # rspec_parity:covers user.admin?
+                  # rspec_parity:covers user.staff?
+                  it 'is privileged'
+                end
+                context 'guest' do # rspec_parity:covers else
+                  it 'is guest'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "lets a single context cover multiple branches and registers no offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            def role_label(user)
+              if user.admin?
+                'admin'
+              elsif user.staff?
+                'staff'
+              else
+                'guest'
+              end
+            end
+          RUBY
+        end
+      end
+
+      context "when a single annotation comment lists several branches with semicolons" do
+        let(:spec_content) do
+          <<~RUBY
+            RSpec.describe UserCreator do
+              describe '#role_label' do
+                context 'privileged' do # rspec_parity:covers user.admin?; user.staff?
+                  it 'is privileged'
+                end
+                context 'guest' do # rspec_parity:covers else
+                  it 'is guest'
+                end
+              end
+            end
+          RUBY
+        end
+
+        it "treats every listed branch as covered and registers no offense" do
+          expect_no_offenses(<<~RUBY, source_path)
+            def role_label(user)
+              if user.admin?
+                'admin'
+              elsif user.staff?
+                'staff'
+              else
+                'guest'
+              end
+            end
+          RUBY
+        end
+      end
+
       context "when only some branches are annotated" do
         let(:spec_content) do
           <<~RUBY

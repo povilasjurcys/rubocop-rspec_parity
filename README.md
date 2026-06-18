@@ -249,7 +249,24 @@ context 'when staff' do # rspec_parity:covers user.staff?
 end
 ```
 
-Re-run and the message advances to the next uncovered branch. Annotations are opt-in and only ever raise coverage — they never create a new violation, and each one covers exactly one branch. A mistyped label is reported with a did-you-mean suggestion.
+Re-run and the message advances to the next uncovered branch. Annotations are opt-in and only ever raise coverage — they never create a new violation. A mistyped label is reported with a did-you-mean suggestion.
+
+Each annotation covers exactly one branch, and the normal expectation is one annotation per context — one context, one scenario, one branch. In rare cases a single context genuinely exercises several branches at once; you can then list more than one branch on it, either as separate comments or with a `;`-separated list:
+
+```ruby
+context 'when fully privileged' do
+  # rspec_parity:covers user.admin?
+  # rspec_parity:covers user.staff?
+  it { is_expected.to be_allowed }
+end
+
+# or, equivalently, on one line:
+context 'when fully privileged' do # rspec_parity:covers user.admin?; user.staff?
+  it { is_expected.to be_allowed }
+end
+```
+
+Reach for this only when the branches really are covered together — multiple annotations on a context that only tests one path inflate coverage and defeat the point of the check.
 
 Long conditions can push the comment past `Layout/LineLength`; exempt these comments rather than editing the label:
 

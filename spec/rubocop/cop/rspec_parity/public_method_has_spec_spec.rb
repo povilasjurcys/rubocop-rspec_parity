@@ -1340,6 +1340,36 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "when both def self.call and def call exist and an alias collides with the . prefix" do
+      let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
+
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserService do
+            describe '#other_method' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "registers an offense without a duplicated alias in the message" do
+        expect_offense(<<~RUBY, source_path)
+          class UserService
+            def self.call(**opts)
+            ^^^^^^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
+              new(**opts).call
+            end
+
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' or describe '.call' in spec/services/user_service_spec.rb
+            end
+          end
+        RUBY
+      end
+    end
+
     context "when alias does not apply to class methods (def self.call)" do
       let(:cop_config) { { "DescribeAliases" => { "#call" => ".call" } } }
 

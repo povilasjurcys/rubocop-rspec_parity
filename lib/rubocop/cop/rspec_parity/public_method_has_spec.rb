@@ -321,7 +321,7 @@ module RuboCop
               describes << "describe '#{alias_desc}'"
             end
           end
-          describes.join(" or ")
+          describes.uniq.join(" or ")
         end
 
         def prefixes_for(instance_method, flexible_prefix)

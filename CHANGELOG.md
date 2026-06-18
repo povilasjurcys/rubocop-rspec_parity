@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2.0.2] - 2026-06-18
+
 Fixed: `PublicMethodHasSpec` now treats a public class method and a public instance method that share a name (the service-object `def self.call` delegating to `def call`) as one logical method — a single `describe '.call'` or `describe '#call'` satisfies both instead of each requiring its own.
 
 ## [2.0.1] - 2026-06-18

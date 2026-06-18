@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [2.0.1] - 2026-06-18
+
 Fixed: `PublicMethodHasSpec` relaxed validation for single-public-method classes (e.g. service objects) no longer passes when the spec's only method-style `describe`/`context` covers a different method — if a method describe is present it must describe the actual public method.
 
 ## [2.0.0] - 2026-06-18

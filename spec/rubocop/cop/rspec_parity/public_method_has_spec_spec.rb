@@ -2062,6 +2062,68 @@ RSpec.describe RuboCop::Cop::RSpecParity::PublicMethodHasSpec, :config do
       end
     end
 
+    context "single method class with a method describe for a different method" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            describe '#do_something' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "registers an offense (method describe present but does not cover the public method)" do
+        expect_offense(<<~RUBY, source_path)
+          class UserCreator
+            def call
+            ^^^^^^^^ Missing spec for public method `call`. Expected describe '#call' in spec/services/user_creator_spec.rb
+              do_something
+            end
+
+            private
+
+            def do_something
+            end
+          end
+        RUBY
+      end
+    end
+
+    context "single method class with method describes for the public method and a private one" do
+      before do
+        allow(File).to receive(:read).with(spec_path).and_return(<<~RUBY)
+          describe UserCreator do
+            describe '#call' do
+              it 'works' do
+              end
+            end
+
+            describe '#do_something' do
+              it 'works' do
+              end
+            end
+          end
+        RUBY
+      end
+
+      it "does not register an offense" do
+        expect_no_offenses(<<~RUBY, source_path)
+          class UserCreator
+            def call
+              do_something
+            end
+
+            private
+
+            def do_something
+            end
+          end
+        RUBY
+      end
+    end
+
     context "path does not match configuration" do
       let(:source_path) { "/project/app/models/user.rb" }
       let(:spec_path) { "/project/spec/models/user_spec.rb" }

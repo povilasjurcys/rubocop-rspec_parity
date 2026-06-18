@@ -219,8 +219,9 @@ module RuboCop
 
           # Check if relaxed validation applies
           if matches_skip_path? && count_public_methods(node) == 1
-            # For single-method classes in configured paths, just check for examples
-            return if spec_paths.any? { |spec_path| spec_has_examples?(spec_path, class_name) }
+            # For single-method classes in configured paths, the method describe is optional —
+            # but if one is present, it must describe the actual public method, not a private/random one.
+            return if relaxed_spec_valid?(spec_paths, class_name, method_name, instance_method, flexible_prefix)
           elsif spec_paths.any? do |sp|
                   spec_covers_method?(sp, method_name, instance_method, flexible_prefix: flexible_prefix)
                 end
@@ -232,6 +233,25 @@ module RuboCop
                                                                   flexible_prefix: flexible_prefix)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+
+        # Relaxed validation for single-public-method classes in skip paths.
+        # Passes when the spec describes the class with examples AND either has no
+        # method-style describe/context block at all, or has one that covers the public method.
+        def relaxed_spec_valid?(spec_paths, class_name, method_name, instance_method, flexible_prefix)
+          return false unless spec_paths.any? { |sp| spec_has_examples?(sp, class_name) }
+          return true unless spec_paths.any? { |sp| spec_has_method_describe?(sp) }
+
+          spec_paths.any? do |sp|
+            spec_covers_method?(sp, method_name, instance_method, flexible_prefix: flexible_prefix)
+          end
+        end
+
+        # Detects a method-style block, e.g. describe '#foo' / context '.bar'
+        # (the char right after the quote is a `#` or `.` prefix), as opposed to a
+        # plain descriptive string or a class constant.
+        def spec_has_method_describe?(spec_path)
+          File.read(spec_path).match?(/(?:describe|context)\s+['"][#.][^'"]+['"]/)
+        end
 
         def spec_covers_method?(spec_path, method_name, instance_method, flexible_prefix: false)
           return true if method_tested_in_spec?(spec_path, method_name, instance_method)

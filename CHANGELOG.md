@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Fixed: `PublicMethodHasSpec` relaxed validation for single-public-method classes (e.g. service objects) no longer passes when the spec's only method-style `describe`/`context` covers a different method — if a method describe is present it must describe the actual public method.
+
 ## [2.0.0] - 2026-06-18
 
 Added: `SufficientContexts` now pinpoints which branch is untested — its message names one uncovered branch and the `# rspec_parity:covers <branch>` annotation to add, and the bundled `rspec-parity-cover` executable lists all of a method's gaps as paste-ready context stubs. Annotations are opt-in (new `CoversAnnotations` config key, default `true`).

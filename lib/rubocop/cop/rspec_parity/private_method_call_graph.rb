@@ -65,8 +65,16 @@ module RuboCop
           tally = branch_counter.call(@methods[key][:node])
           return unless tally.total.positive?
 
-          state[:tally] = state[:tally] ? state[:tally] + tally : tally
+          state[:tally] = combine_tally(state[:tally], tally, @methods[key][:name])
           state[:traced] << key
+        end
+
+        # Attribute the inlined branches to the helper they came from so the cop
+        # can show "label (helper, line N)" and accept origin-prefixed
+        # `# rspec_parity:covers` annotations. Duck-typed: a plain count would skip.
+        def combine_tally(existing, tally, name)
+          tally = tally.with_origin(name) if tally.respond_to?(:with_origin)
+          existing ? existing + tally : tally
         end
 
         def inlinable?(key, visited)

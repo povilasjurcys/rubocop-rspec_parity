@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "rubocop/rspec_parity/coverage_reporter"
+
+target = ARGV[0]
+
+if target.nil? || %w[-h --help].include?(target)
+  warn "Usage: rspec-parity-cover SOURCE_FILE[:LINE] [SPEC_FILE]"
+  warn ""
+  warn "Lists a method's uncovered branches as paste-ready"
+  warn "`context '...' do # rspec_parity:covers <branch>` stubs."
+  warn "Append :LINE (e.g. app/foo.rb:20) to report only the method at that line."
+  warn "The spec file is derived from SOURCE_FILE (app/ -> spec/, *.rb -> *_spec.rb)"
+  warn "unless SPEC_FILE is given."
+  exit(target.nil? ? 1 : 0)
+end
+
+source, line = target.match(/\A(?<path>.+):(?<line>\d+)\z/)&.named_captures&.values_at("path", "line") || [target, nil]
+
+abort "rspec-parity-cover: no such file: #{source}" unless File.file?(source)
+
+reporter = RuboCop::RSpecParity::CoverageReporter.new(source, spec_path: ARGV[1], line: line&.to_i)
+output = reporter.render
+puts output.empty? ? "# No uncovered branches found for #{target}." : output

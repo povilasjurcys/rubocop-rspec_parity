@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+Added: `SufficientContexts` now pinpoints which branch is untested — its message names one uncovered branch and the `# rspec_parity:covers <branch>` annotation to add, and the bundled `rspec-parity-cover` executable lists all of a method's gaps as paste-ready context stubs. Annotations are opt-in (new `CoversAnnotations` config key, default `true`).
+
 ## [1.7.0] - 2026-06-11
 
 Fixed: `SufficientContexts` no longer over-counts chains of guard clauses (`return`/`raise`/`next ... if/unless`). A sequence of guards shares a single "all guards pass" fall-through, so that happy path is counted once for the whole method instead of once per guard. Each `&&`/`||` inside a guard condition is still counted as a distinct way for the guard to fire (one scenario per operand).

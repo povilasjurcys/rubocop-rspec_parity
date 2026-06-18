@@ -33,5 +33,6 @@ RSpecParity/SufficientContexts:
   Enabled: true
   IgnoreMemoization: true
   TraceSingleUsePrivateMethods: true
+  CoversAnnotations: true
   SkipMethodDescribeFor: []
   DescribeAliases: {}

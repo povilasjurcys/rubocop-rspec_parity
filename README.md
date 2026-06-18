@@ -230,6 +230,59 @@ end
 **Configuration options:**
 
 - `IgnoreMemoization` (default: `true`) - When enabled, common memoization patterns like `@var ||=` and `return @var if defined?(@var)` are not counted as branches. Set to `false` if you want to count these as branches.
+- `CoversAnnotations` (default: `true`) - Enables the `# rspec_parity:covers` annotations described below. Set to `false` to revert to the plain numeric message.
+
+#### Pinpointing the missing branch with `# rspec_parity:covers`
+
+Instead of a bare count, the violation names one uncovered branch and gives the exact context to add:
+
+```
+Missing coverage for `user.staff?` (line 4) — 2 of 3 branches untested.
+Add `context '...' do # rspec_parity:covers user.staff?` to mark it covered.
+```
+
+Tag a context with the branch it covers (trailing, or on its own line inside the block):
+
+```ruby
+context 'when staff' do # rspec_parity:covers user.staff?
+  it { is_expected.to eq('staff') }
+end
+```
+
+Re-run and the message advances to the next uncovered branch. Annotations are opt-in and only ever raise coverage — they never create a new violation, and each one covers exactly one branch. A mistyped label is reported with a did-you-mean suggestion.
+
+Long conditions can push the comment past `Layout/LineLength`; exempt these comments rather than editing the label:
+
+```yaml
+Layout/LineLength:
+  AllowedPatterns:
+    - 'rspec_parity:covers'
+```
+
+##### Listing every uncovered branch (`rspec-parity-cover`)
+
+To get all the gaps for a method at once as ready-to-paste stubs:
+
+```
+$ bundle exec rspec-parity-cover app/services/classifier.rb
+
+# classify — 2 uncovered branches:
+context '...' do
+  # rspec_parity:covers user.staff?
+
+  it '...' do
+  end
+end
+
+context '...' do
+  # rspec_parity:covers else of user.admin?
+
+  it '...' do
+  end
+end
+```
+
+It derives the spec path (or take a second argument), and accepts `app/foo.rb:42` to report only the method at that line. When a method has many untested branches, the cop's message points you straight at this command.
 
 ## Assumptions
 
